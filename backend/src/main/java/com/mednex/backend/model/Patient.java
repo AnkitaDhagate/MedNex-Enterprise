@@ -1,27 +1,32 @@
 package com.mednex.backend.model;
 
+import io.hypersistence.utils.hibernate.type.json.JsonBinaryType;
 import jakarta.persistence.*;
 import lombok.Data;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
+import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Type;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Entity
 @Table(name = "patients")
 @Data
+@NoArgsConstructor
 public class Patient {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "patient_id", nullable = false)
+    @Column(name = "patient_id", unique = true)
     private String patientId;
 
     @Column(name = "tenant_id", nullable = false)
     private String tenantId;
 
+    // ---- Personal Info ----
     @Column(name = "first_name", nullable = false)
     private String firstName;
 
@@ -31,12 +36,10 @@ public class Patient {
     @Column(name = "middle_name")
     private String middleName;
 
-    @Column(name = "date_of_birth", nullable = false)
+    @Column(name = "date_of_birth")
     private LocalDate dateOfBirth;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "gender", nullable = false)
-    private Gender gender;
+    private String gender;
 
     @Convert(converter = BloodGroupConverter.class)
     @Column(name = "blood_group")
@@ -49,6 +52,7 @@ public class Patient {
     @Column(name = "alternate_phone")
     private String alternatePhone;
 
+    // ---- Address ----
     @Column(name = "address_line1")
     private String addressLine1;
 
@@ -65,40 +69,41 @@ public class Patient {
     private String nationality;
     private String occupation;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "marital_status")
-    private MaritalStatus maritalStatus;
+    private String maritalStatus;
 
     private String religion;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "medical_history", columnDefinition = "json")
-    private String medicalHistory;
+    // ---- Medical History (JSONB) ----
+    @Type(JsonBinaryType.class)
+    @Column(columnDefinition = "jsonb", name = "medical_history")
+    private Map<String, Object> medicalHistory;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "current_medications", columnDefinition = "json")
-    private String currentMedications;
+    @Type(JsonBinaryType.class)
+    @Column(columnDefinition = "jsonb", name = "current_medications")
+    private Map<String, Object> currentMedications;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "json")
-    private String allergies;
+    @Type(JsonBinaryType.class)
+    @Column(columnDefinition = "jsonb")
+    private Map<String, Object> allergies;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "chronic_conditions", columnDefinition = "json")
-    private String chronicConditions;
+    @Type(JsonBinaryType.class)
+    @Column(columnDefinition = "jsonb", name = "chronic_conditions")
+    private Map<String, Object> chronicConditions;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "json")
-    private String immunizations;
+    @Type(JsonBinaryType.class)
+    @Column(columnDefinition = "jsonb")
+    private Map<String, Object> immunizations;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "family_history", columnDefinition = "json")
-    private String familyHistory;
+    @Type(JsonBinaryType.class)
+    @Column(columnDefinition = "jsonb", name = "family_history")
+    private Map<String, Object> familyHistory;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "lifestyle_factors", columnDefinition = "json")
-    private String lifestyleFactors;
+    @Type(JsonBinaryType.class)
+    @Column(columnDefinition = "jsonb", name = "lifestyle_factors")
+    private Map<String, Object> lifestyleFactors;
 
+    // ---- Emergency Contact ----
     @Column(name = "emergency_contact_name")
     private String emergencyContactName;
 
@@ -108,9 +113,7 @@ public class Patient {
     @Column(name = "emergency_contact_phone")
     private String emergencyContactPhone;
 
-    @Column(name = "emergency_contact_alternate")
-    private String emergencyContactAlternate;
-
+    // ---- Insurance ----
     @Column(name = "insurance_provider")
     private String insuranceProvider;
 
@@ -126,44 +129,44 @@ public class Patient {
     @Column(name = "insurance_valid_to")
     private LocalDate insuranceValidTo;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "insurance_details", columnDefinition = "json")
-    private String insuranceDetails;
+    @Type(JsonBinaryType.class)
+    @Column(columnDefinition = "jsonb", name = "insurance_details")
+    private Map<String, Object> insuranceDetails;
 
+    // ---- Doctor ----
     @Column(name = "primary_doctor_id")
     private Long primaryDoctorId;
 
     @Column(name = "primary_doctor_name")
     private String primaryDoctorName;
 
-    @Enumerated(EnumType.STRING)
+    // ---- Status ----
     @Column(name = "patient_status")
-    private PatientStatus patientStatus;
+    private String patientStatus;
 
-    @Column(name = "registration_date", nullable = false)
+    @Column(name = "registration_date")
     private LocalDate registrationDate;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "registration_type")
-    private RegistrationType registrationType;
+    private String registrationType;
 
     private String notes;
-
-    @Column(name = "profile_photo_url")
-    private String profilePhotoUrl;
-
-    @Column(name = "created_by")
-    private Long createdBy;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_by")
-    private Long updatedBy;
-
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
+    @PrePersist
+    public void prePersist() {
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+        if (this.registrationDate == null) this.registrationDate = LocalDate.now();
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
 }

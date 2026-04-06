@@ -1,27 +1,19 @@
 package com.mednex.backend.tenant;
 
 public class TenantContext {
-    private static final ThreadLocal<String> currentTenant = new ThreadLocal<>();
+
+    private static final ThreadLocal<String> CURRENT_TENANT
+            = new ThreadLocal<>();
 
     public static void setCurrentTenant(String tenantId) {
-        if (tenantId != null && !tenantId.trim().isEmpty()) {
-            currentTenant.set(tenantId.trim());
-        } else {
-            currentTenant.set("HOSP_A"); // Default tenant
-        }
+        CURRENT_TENANT.set(tenantId);
     }
 
     public static String getCurrentTenant() {
-        String tenant = currentTenant.get();
-        return (tenant != null && !tenant.isEmpty()) ? tenant : "HOSP_A";
+        return CURRENT_TENANT.get();
     }
 
     public static void clear() {
-        currentTenant.remove();
-    }
-
-    public static boolean isValidTenant() {
-        String tenant = getCurrentTenant();
-        return tenant != null && !tenant.isEmpty() && !tenant.equals("PUBLIC");
+        CURRENT_TENANT.remove();
     }
 }

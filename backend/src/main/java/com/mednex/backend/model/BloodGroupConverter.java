@@ -13,6 +13,6 @@ public class BloodGroupConverter implements AttributeConverter<BloodGroup, Strin
 
     @Override
     public BloodGroup convertToEntityAttribute(String dbData) {
-        return dbData == null ? null : BloodGroup.fromDbValue(dbData);
+        return BloodGroup.fromDbValue(dbData);
     }
 }

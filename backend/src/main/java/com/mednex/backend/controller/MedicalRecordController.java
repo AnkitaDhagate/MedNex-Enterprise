@@ -7,28 +7,58 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/medical-records")
-@CrossOrigin(origins = "http://localhost:3000")
 @RequiredArgsConstructor
 public class MedicalRecordController {
 
     private final MedicalRecordService medicalRecordService;
 
     @PostMapping
-    public ResponseEntity<MedicalRecord> createMedicalRecord(@RequestBody MedicalRecordDTO recordDTO) {
-        return ResponseEntity.ok(medicalRecordService.createMedicalRecord(recordDTO));
+    public ResponseEntity<?> createMedicalRecord(@RequestBody MedicalRecordDTO dto) {
+        try {
+            return ResponseEntity.ok(medicalRecordService.createMedicalRecord(dto));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 
-    @GetMapping("/patient/{patientId}")
-    public ResponseEntity<List<MedicalRecord>> getPatientRecords(@PathVariable Long patientId) {
-        return ResponseEntity.ok(medicalRecordService.getPatientMedicalRecords(patientId));
+    @GetMapping
+    public ResponseEntity<?> getAllRecords() {
+        try {
+            return ResponseEntity.ok(medicalRecordService.getAllRecords());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<MedicalRecord> getMedicalRecord(@PathVariable Long id) {
-        return ResponseEntity.ok(medicalRecordService.getMedicalRecord(id));
+    public ResponseEntity<?> getMedicalRecord(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(medicalRecordService.getMedicalRecord(id));
+        } catch (Exception e) {
+            return ResponseEntity.status(404).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/patient/{patientId}")
+    public ResponseEntity<?> getPatientRecords(@PathVariable Long patientId) {
+        try {
+            return ResponseEntity.ok(medicalRecordService.getPatientMedicalRecords(patientId));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateMedicalRecord(@PathVariable Long id,
+                                                 @RequestBody MedicalRecordDTO dto) {
+        try {
+            return ResponseEntity.ok(medicalRecordService.updateMedicalRecord(id, dto));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 }

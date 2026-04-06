@@ -2,12 +2,18 @@ package com.mednex.backend.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "users")
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class User {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -18,7 +24,7 @@ public class User {
     @Column(nullable = false)
     private String password;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String email;
 
     @Column(name = "first_name")
@@ -30,7 +36,7 @@ public class User {
     @Column(name = "tenant_id", nullable = false)
     private String tenantId;
 
-    private String role;
+    private String role; // ADMIN, DOCTOR, NURSE, RECEPTIONIST
 
     @Column(name = "is_active")
     private Boolean isActive = true;
@@ -38,6 +44,11 @@ public class User {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
+    @Column(name = "last_login")
+    private LocalDateTime lastLogin;
+
+    @PrePersist
+    public void prePersist() {
+        this.createdAt = LocalDateTime.now();
+    }
 }

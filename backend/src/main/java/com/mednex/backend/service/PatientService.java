@@ -1,11 +1,12 @@
 package com.mednex.backend.service;
 
 import com.mednex.backend.dto.PatientDTO;
-import com.mednex.backend.model.*;
+import com.mednex.backend.model.BloodGroup;
+import com.mednex.backend.model.Patient;
 import com.mednex.backend.repository.PatientRepository;
 import com.mednex.backend.tenant.TenantContext;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,165 +19,137 @@ import java.util.UUID;
 public class PatientService {
 
     private final PatientRepository patientRepository;
-    private final ObjectMapper objectMapper;
+    private final AuditService auditService;
+
+    private String currentTenant() {
+        String t = TenantContext.getCurrentTenant();
+        if (t == null || t.isBlank()) throw new RuntimeException("Tenant context not set.");
+        return t;
+    }
+
+    private String currentUser() {
+        try {
+            return SecurityContextHolder.getContext().getAuthentication().getName();
+        } catch (Exception e) {
+            return "system";
+        }
+    }
 
     @Transactional
-    public Patient createPatient(PatientDTO patientDTO) {
-        String tenantId = TenantContext.getCurrentTenant();
-
-        if (tenantId == null) {
-            throw new RuntimeException("Tenant ID not found in context");
+    public Patient createPatient(PatientDTO dto) {
+        String tenantId = currentTenant();
+        Patient p = new Patient();
+        mapDtoToPatient(dto, p);
+        p.setTenantId(tenantId);
+        if (p.getPatientId() == null || p.getPatientId().isBlank()) {
+            p.setPatientId("PAT-" + tenantId.toUpperCase().replace("_", "") + "-"
+                    + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
         }
-
-        Patient patient = new Patient();
-        patient.setPatientId(generatePatientId());
-        patient.setTenantId(tenantId);
-        patient.setFirstName(patientDTO.getFirstName());
-        patient.setLastName(patientDTO.getLastName());
-        patient.setMiddleName(patientDTO.getMiddleName());
-        patient.setDateOfBirth(patientDTO.getDateOfBirth());
-        patient.setGender(Gender.valueOf(patientDTO.getGender()));
-
-        if (patientDTO.getBloodGroup() != null) {
-            // BloodGroup DTO sends Java enum name (e.g. "A_POSITIVE"); converter handles DB mapping
-            patient.setBloodGroup(BloodGroup.valueOf(patientDTO.getBloodGroup()));
-        }
-
-        patient.setEmail(patientDTO.getEmail());
-        patient.setPhone(patientDTO.getPhone());
-        patient.setMobile(patientDTO.getMobile());
-        patient.setAlternatePhone(patientDTO.getAlternatePhone());
-        patient.setAddressLine1(patientDTO.getAddressLine1());
-        patient.setAddressLine2(patientDTO.getAddressLine2());
-        patient.setCity(patientDTO.getCity());
-        patient.setState(patientDTO.getState());
-        patient.setPostalCode(patientDTO.getPostalCode());
-        patient.setCountry(patientDTO.getCountry());
-        patient.setNationality(patientDTO.getNationality());
-        patient.setOccupation(patientDTO.getOccupation());
-
-        if (patientDTO.getMaritalStatus() != null) {
-            patient.setMaritalStatus(MaritalStatus.valueOf(patientDTO.getMaritalStatus()));
-        }
-
-        patient.setReligion(patientDTO.getReligion());
-
-        // Convert JSON fields
-        try {
-            if (patientDTO.getMedicalHistory() != null) {
-                patient.setMedicalHistory(objectMapper.writeValueAsString(patientDTO.getMedicalHistory()));
-            }
-            if (patientDTO.getAllergies() != null) {
-                patient.setAllergies(objectMapper.writeValueAsString(patientDTO.getAllergies()));
-            }
-            if (patientDTO.getChronicConditions() != null) {
-                patient.setChronicConditions(objectMapper.writeValueAsString(patientDTO.getChronicConditions()));
-            }
-            if (patientDTO.getCurrentMedications() != null) {
-                patient.setCurrentMedications(objectMapper.writeValueAsString(patientDTO.getCurrentMedications()));
-            }
-            if (patientDTO.getFamilyHistory() != null) {
-                patient.setFamilyHistory(objectMapper.writeValueAsString(patientDTO.getFamilyHistory()));
-            }
-            if (patientDTO.getImmunizations() != null) {
-                patient.setImmunizations(objectMapper.writeValueAsString(patientDTO.getImmunizations()));
-            }
-            if (patientDTO.getLifestyleFactors() != null) {
-                patient.setLifestyleFactors(objectMapper.writeValueAsString(patientDTO.getLifestyleFactors()));
-            }
-            if (patientDTO.getInsuranceDetails() != null) {
-                patient.setInsuranceDetails(objectMapper.writeValueAsString(patientDTO.getInsuranceDetails()));
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Error processing JSON fields", e);
-        }
-
-        patient.setEmergencyContactName(patientDTO.getEmergencyContactName());
-        patient.setEmergencyContactRelationship(patientDTO.getEmergencyContactRelationship());
-        patient.setEmergencyContactPhone(patientDTO.getEmergencyContactPhone());
-        patient.setEmergencyContactAlternate(patientDTO.getEmergencyContactAlternate());
-
-        patient.setInsuranceProvider(patientDTO.getInsuranceProvider());
-        patient.setInsurancePolicyNumber(patientDTO.getInsurancePolicyNumber());
-        patient.setInsuranceGroupNumber(patientDTO.getInsuranceGroupNumber());
-        patient.setInsuranceValidFrom(patientDTO.getInsuranceValidFrom());
-        patient.setInsuranceValidTo(patientDTO.getInsuranceValidTo());
-
-        patient.setPrimaryDoctorId(patientDTO.getPrimaryDoctorId());
-        patient.setPrimaryDoctorName(patientDTO.getPrimaryDoctorName());
-
-        if (patientDTO.getPatientStatus() != null) {
-            patient.setPatientStatus(PatientStatus.valueOf(patientDTO.getPatientStatus()));
-        } else {
-            patient.setPatientStatus(PatientStatus.ACTIVE);
-        }
-
-        patient.setRegistrationDate(patientDTO.getRegistrationDate() != null
-                ? patientDTO.getRegistrationDate()
-                : LocalDateTime.now().toLocalDate());
-
-        if (patientDTO.getRegistrationType() != null) {
-            patient.setRegistrationType(RegistrationType.valueOf(patientDTO.getRegistrationType()));
-        } else {
-            patient.setRegistrationType(RegistrationType.OPD);
-        }
-
-        patient.setNotes(patientDTO.getNotes());
-        patient.setCreatedAt(LocalDateTime.now());
-        patient.setUpdatedAt(LocalDateTime.now());
-
-        return patientRepository.save(patient);
+        Patient saved = patientRepository.save(p);
+        auditService.log(currentUser(), "CREATE", "PATIENT",
+                String.valueOf(saved.getId()), "Created patient: " + saved.getFirstName() + " " + saved.getLastName());
+        return saved;
     }
 
     public List<Patient> getAllPatients() {
-        String tenantId = TenantContext.getCurrentTenant();
-        if (tenantId == null) {
-            throw new RuntimeException("Tenant ID not found in context");
-        }
-        return patientRepository.findAllActiveByTenant(tenantId);
+        String tenantId = currentTenant();
+        auditService.log(currentUser(), "READ", "PATIENT", "ALL", "Fetched all patients for tenant: " + tenantId);
+        return patientRepository.findByTenantIdOrderByCreatedAtDesc(tenantId);
     }
 
     public Patient getPatientById(Long id) {
-        String tenantId = TenantContext.getCurrentTenant();
-        if (tenantId == null) {
-            throw new RuntimeException("Tenant ID not found in context");
-        }
-        return patientRepository.findById(id)
-                .filter(p -> p.getTenantId().equals(tenantId))
+        String tenantId = currentTenant();
+        Patient p = patientRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Patient not found with id: " + id));
+        if (!p.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Cross-tenant access denied.");
+        }
+        auditService.log(currentUser(), "READ", "PATIENT", String.valueOf(id),
+                "Viewed patient: " + p.getFirstName() + " " + p.getLastName());
+        return p;
     }
 
-    public List<Patient> searchPatients(String searchTerm) {
-        String tenantId = TenantContext.getCurrentTenant();
-        if (tenantId == null) {
-            throw new RuntimeException("Tenant ID not found in context");
-        }
-        return patientRepository.searchPatients(tenantId, searchTerm);
+    public List<Patient> searchPatients(String term) {
+        String tenantId = currentTenant();
+        return patientRepository.searchPatients(tenantId, term);
     }
 
     @Transactional
-    public Patient updatePatient(Long id, PatientDTO patientDTO) {
-        Patient existingPatient = getPatientById(id);
-
-        existingPatient.setFirstName(patientDTO.getFirstName());
-        existingPatient.setLastName(patientDTO.getLastName());
-        existingPatient.setMiddleName(patientDTO.getMiddleName());
-        existingPatient.setDateOfBirth(patientDTO.getDateOfBirth());
-        existingPatient.setEmail(patientDTO.getEmail());
-        existingPatient.setPhone(patientDTO.getPhone());
-        existingPatient.setMobile(patientDTO.getMobile());
-        existingPatient.setAddressLine1(patientDTO.getAddressLine1());
-        existingPatient.setCity(patientDTO.getCity());
-        existingPatient.setState(patientDTO.getState());
-        existingPatient.setPostalCode(patientDTO.getPostalCode());
-        existingPatient.setUpdatedAt(LocalDateTime.now());
-
-        return patientRepository.save(existingPatient);
+    public Patient updatePatient(Long id, PatientDTO dto) {
+        String tenantId = currentTenant();
+        Patient p = patientRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Patient not found: " + id));
+        if (!p.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Cross-tenant access denied.");
+        }
+        mapDtoToPatient(dto, p);
+        Patient saved = patientRepository.save(p);
+        auditService.log(currentUser(), "UPDATE", "PATIENT", String.valueOf(id),
+                "Updated patient: " + saved.getFirstName() + " " + saved.getLastName());
+        return saved;
     }
 
-    private String generatePatientId() {
-        String tenantId = TenantContext.getCurrentTenant();
-        String prefix = tenantId.substring(0, Math.min(4, tenantId.length()));
-        return prefix + "_" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+    @Transactional
+    public void deletePatient(Long id) {
+        String tenantId = currentTenant();
+        Patient p = patientRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Patient not found: " + id));
+        if (!p.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Cross-tenant access denied.");
+        }
+        patientRepository.delete(p);
+        auditService.log(currentUser(), "DELETE", "PATIENT", String.valueOf(id), "Deleted patient.");
+    }
+
+    public List<Patient> getRecentPatients() {
+        String tenantId = currentTenant();
+        return patientRepository.findRecentByTenantId(tenantId, LocalDateTime.now().minusDays(7));
+    }
+
+    private void mapDtoToPatient(PatientDTO dto, Patient p) {
+        p.setFirstName(dto.getFirstName());
+        p.setLastName(dto.getLastName());
+        p.setMiddleName(dto.getMiddleName());
+        p.setDateOfBirth(dto.getDateOfBirth());
+        p.setGender(dto.getGender());
+        if (dto.getBloodGroup() != null) {
+            p.setBloodGroup(BloodGroup.fromDbValue(dto.getBloodGroup()));
+        }
+        p.setEmail(dto.getEmail());
+        p.setPhone(dto.getPhone());
+        p.setMobile(dto.getMobile());
+        p.setAlternatePhone(dto.getAlternatePhone());
+        p.setAddressLine1(dto.getAddressLine1());
+        p.setAddressLine2(dto.getAddressLine2());
+        p.setCity(dto.getCity());
+        p.setState(dto.getState());
+        p.setPostalCode(dto.getPostalCode());
+        p.setCountry(dto.getCountry());
+        p.setNationality(dto.getNationality());
+        p.setOccupation(dto.getOccupation());
+        p.setMaritalStatus(dto.getMaritalStatus());
+        p.setReligion(dto.getReligion());
+        p.setMedicalHistory(dto.getMedicalHistory());
+        p.setCurrentMedications(dto.getCurrentMedications());
+        p.setAllergies(dto.getAllergies());
+        p.setChronicConditions(dto.getChronicConditions());
+        p.setImmunizations(dto.getImmunizations());
+        p.setFamilyHistory(dto.getFamilyHistory());
+        p.setLifestyleFactors(dto.getLifestyleFactors());
+        p.setEmergencyContactName(dto.getEmergencyContactName());
+        p.setEmergencyContactRelationship(dto.getEmergencyContactRelationship());
+        p.setEmergencyContactPhone(dto.getEmergencyContactPhone());
+        p.setInsuranceProvider(dto.getInsuranceProvider());
+        p.setInsurancePolicyNumber(dto.getInsurancePolicyNumber());
+        p.setInsuranceGroupNumber(dto.getInsuranceGroupNumber());
+        p.setInsuranceValidFrom(dto.getInsuranceValidFrom());
+        p.setInsuranceValidTo(dto.getInsuranceValidTo());
+        p.setInsuranceDetails(dto.getInsuranceDetails());
+        p.setPrimaryDoctorId(dto.getPrimaryDoctorId());
+        p.setPrimaryDoctorName(dto.getPrimaryDoctorName());
+        p.setPatientStatus(dto.getPatientStatus() != null ? dto.getPatientStatus() : "ACTIVE");
+        p.setRegistrationDate(dto.getRegistrationDate());
+        p.setRegistrationType(dto.getRegistrationType());
+        p.setNotes(dto.getNotes());
     }
 }

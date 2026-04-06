@@ -1,16 +1,11 @@
 package com.mednex.backend.dto;
 
 import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Map;
 
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
 public class MedicalRecordDTO {
     private String recordId;
     private Long patientId;
