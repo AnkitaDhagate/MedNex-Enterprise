@@ -1,0 +1,143 @@
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Background orbs */
+.login-bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+.bg-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.15;
+}
+.orb1 { width: 500px; height: 500px; background: var(--teal); top: -100px; left: -100px; animation: float1 8s ease-in-out infinite; }
+.orb2 { width: 400px; height: 400px; background: var(--navy-light); bottom: -100px; right: 30%; animation: float2 10s ease-in-out infinite; }
+.orb3 { width: 300px; height: 300px; background: var(--gold); top: 40%; right: 10%; animation: float1 12s ease-in-out infinite reverse; }
+
+@keyframes float1 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(30px, -30px); } }
+@keyframes float2 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-20px, 20px); } }
+
+/* Left panel */
+.login-left {
+  flex: 1.2;
+  background: linear-gradient(135deg, var(--navy-mid), var(--navy));
+  border-right: 1px solid var(--card-border);
+  display: flex; align-items: center; justify-content: center;
+  padding: 40px;
+  position: relative; z-index: 1;
+}
+.login-branding { max-width: 440px; width: 100%; }
+
+.brand-logo { display: flex; align-items: center; gap: 16px; margin-bottom: 36px; }
+.brand-icon {
+  width: 52px; height: 52px;
+  background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Playfair Display', serif;
+  font-size: 24px; font-weight: 700; color: white;
+  box-shadow: var(--shadow-teal);
+}
+.brand-name {
+  font-family: 'Playfair Display', serif;
+  font-size: 28px; font-weight: 700; color: var(--text-primary);
+}
+.brand-tagline { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+
+.hospital-visual { position: relative; border-radius: 16px; overflow: hidden; margin-bottom: 28px; }
+.hospital-img { width: 100%; height: 240px; object-fit: cover; display: block; }
+.img-overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(to bottom, transparent 40%, var(--navy-mid));
+}
+
+.brand-stats {
+  display: flex; align-items: center; gap: 20px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 16px 24px;
+  margin-bottom: 20px;
+}
+.stat-item { flex: 1; text-align: center; }
+.stat-num {
+  display: block;
+  font-family: 'Playfair Display', serif;
+  font-size: 18px; font-weight: 700; color: var(--teal);
+}
+.stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-divider { width: 1px; height: 36px; background: var(--card-border); }
+
+.brand-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+
+/* Right panel */
+.login-right {
+  flex: 0 0 460px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 40px;
+  position: relative; z-index: 1;
+}
+.login-card {
+  width: 100%; max-width: 380px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 20px;
+  padding: 36px 32px;
+  backdrop-filter: blur(20px);
+  box-shadow: var(--shadow), var(--shadow-teal);
+}
+.login-header { margin-bottom: 28px; }
+.login-header h1 {
+  font-size: 26px; font-weight: 700; color: var(--text-primary);
+  margin-bottom: 6px;
+}
+.login-header p { font-size: 14px; color: var(--text-muted); }
+
+.login-form { display: flex; flex-direction: column; gap: 18px; margin-bottom: 16px; }
+.login-btn { width: 100%; justify-content: center; font-size: 15px !important; padding: 13px !important; }
+
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+
+/* Switch between login / register */
+.auth-switch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.auth-switch-link {
+  color: var(--teal);
+  font-weight: 600;
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+
+.auth-switch-link:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+.login-footer {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: 11px; color: var(--text-muted);
+}
+.dot-sep { color: var(--card-border); }
+
+@media (max-width: 900px) {
+  .login-left { display: none; }
+  .login-right { flex: 1; }
+}

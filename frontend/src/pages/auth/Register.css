@@ -1,0 +1,115 @@
+/* Register page — extends Login styles, adds register-specific overrides */
+
+.register-page {
+  min-height: 100vh;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Reuse login background and left-panel styles via shared class names */
+/* (login-bg, bg-orb, orb1/2/3, login-left, login-branding, etc. are in Login.css) */
+
+/* Right panel — taller card needs more scroll room */
+.register-right {
+  flex: 0 0 520px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 32px 40px;
+  overflow-y: auto;
+  position: relative;
+  z-index: 1;
+}
+
+.register-card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 20px;
+  padding: 32px;
+  backdrop-filter: blur(20px);
+  box-shadow: var(--shadow), var(--shadow-teal);
+  margin: auto 0;
+}
+
+/* Two-column row for paired fields */
+.register-form .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.register-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+/* Password toggle wrapper */
+.input-with-toggle {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-with-toggle .form-control {
+  width: 100%;
+  padding-right: 44px;
+}
+
+.toggle-password {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+  color: var(--text-muted);
+  transition: opacity 0.2s;
+}
+
+.toggle-password:hover {
+  opacity: 0.8;
+}
+
+/* Switch to login link */
+.auth-switch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.auth-switch-link {
+  color: var(--teal);
+  font-weight: 600;
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+
+.auth-switch-link:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+@media (max-width: 900px) {
+  .login-left { display: none; }
+  .register-right {
+    flex: 1;
+    padding: 24px 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .register-form .form-row {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,35 @@
+.audit-page { display:flex; flex-direction:column; gap:20px; }
+.audit-hero { display:flex; align-items:center; justify-content:space-between; padding:22px 28px; }
+.audit-hero h2 { font-size:20px; color:var(--text-primary); margin-bottom:6px; }
+.audit-hero p  { font-size:13px; color:var(--text-muted); }
+.audit-badge { display:flex; align-items:center; gap:10px; background:rgba(0,180,216,0.08); border:1px solid rgba(0,180,216,0.2); padding:12px 18px; border-radius:var(--radius-sm); }
+.audit-badge span { font-size:24px; }
+.audit-badge div:first-of-type { font-size:13px; font-weight:600; color:var(--teal); }
+
+.audit-stats {}
+.audit-stat { padding:18px 20px; position:relative; overflow:hidden; }
+.audit-stat::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; }
+.audit-stat.color-teal::before    { background:var(--teal); }
+.audit-stat.color-success::before { background:var(--success); }
+.audit-stat.color-warning::before { background:var(--warning); }
+.audit-stat.color-danger::before  { background:var(--danger); }
+.audit-stat .stat-icon  { display:block; font-size:22px; margin-bottom:8px; }
+.audit-stat .stat-value { display:block; font-family:'Playfair Display',serif; font-size:26px; font-weight:700; color:var(--text-primary); }
+.audit-stat .stat-label { display:block; font-size:12px; color:var(--text-muted); }
+
+.audit-filters { display:flex; align-items:center; gap:12px; padding:14px 20px; }
+
+.audit-row.action-delete td { border-left: 2px solid transparent; }
+.audit-row.action-delete { border-left: 2px solid rgba(230,57,70,0.3); }
+.audit-row.action-export { border-left: 2px solid rgba(244,162,97,0.3); }
+.audit-row.action-login  { border-left: 2px solid rgba(46,196,182,0.3); }
+.user-cell { display:flex; align-items:center; gap:8px; }
+.empty-row { text-align:center; color:var(--text-muted); padding:40px !important; }
+
+.gdpr-note {
+  display:flex; align-items:flex-start; gap:14px; padding:18px 22px;
+  background:rgba(0,0,0,0.2);
+  font-size:13px; color:var(--text-muted); line-height:1.7;
+}
+.gdpr-note span { font-size:20px; flex-shrink:0; }
+.gdpr-note strong { color:var(--text-secondary); }
