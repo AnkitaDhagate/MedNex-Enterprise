@@ -1,0 +1,80 @@
+/* MedicalRecords.css */
+.medical-records-page { display:flex; flex-direction:column; gap:18px; animation:fadeIn 0.3s ease; }
+
+.mr-banner {
+  display:flex; align-items:center; justify-content:space-between; gap:20px;
+  padding:22px 28px; background:linear-gradient(135deg,rgba(167,139,250,0.07),rgba(0,212,255,0.04));
+  border:1px solid rgba(167,139,250,0.15); border-radius:var(--radius); flex-wrap:wrap;
+}
+.mrb-left { display:flex; align-items:center; gap:16px; flex:1; min-width:200px; }
+.mrb-left h1 { font-size:20px; font-weight:800; color:var(--text-primary); margin-bottom:4px; }
+.mrb-left p  { font-size:12px; color:var(--text-muted); }
+
+.mr-total-badge { text-align:center; padding:12px 20px; background:rgba(0,212,255,0.06); border:1px solid rgba(0,212,255,0.15); border-radius:var(--radius-sm); }
+
+/* Patient Selector */
+.mr-selector { display:flex; align-items:flex-end; gap:16px; padding:20px 24px; }
+
+/* Patient Summary */
+.patient-summary-card {
+  display:flex; align-items:center; gap:16px;
+  padding:18px 24px; background:rgba(0,212,255,0.04);
+  border:1px solid rgba(0,212,255,0.12); border-radius:var(--radius);
+}
+.psc-avatar {
+  width:56px; height:56px; border-radius:14px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:20px; font-weight:800; color:#fff; flex-shrink:0;
+  box-shadow:0 4px 16px rgba(0,0,0,0.3);
+}
+.psc-info { flex:1; }
+.psc-name { font-size:18px; font-weight:800; color:var(--text-primary); margin-bottom:5px; }
+.psc-meta { display:flex; flex-wrap:wrap; gap:6px; font-size:12px; color:var(--text-secondary); align-items:center; }
+.psc-allergies { margin-top:8px; font-size:12px; color:var(--amber); background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.2); padding:5px 12px; border-radius:6px; display:inline-block; }
+.psc-record-count { text-align:center; }
+
+/* Records List */
+.records-list { display:flex; flex-direction:column; gap:10px; }
+
+.record-card { overflow:hidden; transition:var(--trans); }
+.record-card:hover { border-color:var(--border-hover); }
+
+.rc-header {
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:16px 20px; cursor:pointer;
+}
+.rc-left  { display:flex; align-items:center; gap:14px; flex:1; min-width:0; }
+.rc-enc-icon { font-size:24px; flex-shrink:0; }
+.rc-title { font-size:14px; font-weight:700; color:var(--text-primary); margin-bottom:5px; }
+.rc-meta  { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-muted); flex-wrap:wrap; }
+.rc-right { flex-shrink:0; }
+
+.rc-body { padding:0 20px 20px; border-top:1px solid var(--border-light); padding-top:16px; }
+.rc-section { margin-bottom:16px; }
+.rc-section-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+
+/* Vitals */
+.vitals-grid { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+.vital-chip {
+  background:rgba(0,212,255,0.05); border:1px solid rgba(0,212,255,0.12);
+  border-radius:8px; padding:8px 14px; text-align:center; min-width:80px;
+}
+.vc-val { font-size:15px; font-weight:800; color:var(--cyan); }
+.vc-key { font-size:10px; color:var(--text-muted); margin-top:2px; text-transform:uppercase; letter-spacing:0.04em; }
+
+/* Code block */
+.code-block {
+  background:rgba(0,0,0,0.2); border:1px solid var(--border-light);
+  border-radius:6px; padding:10px 14px; font-family:'JetBrains Mono',monospace;
+  font-size:11px; color:var(--emerald); overflow-x:auto; max-height:120px;
+  line-height:1.5;
+}
+
+/* Follow-up Notice */
+.follow-up-notice {
+  background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.2);
+  border-radius:8px; padding:10px 16px; font-size:13px; color:var(--amber);
+  margin-top:12px;
+}
+
+@media (max-width:900px) { .rc-section-grid { grid-template-columns:1fr; } }

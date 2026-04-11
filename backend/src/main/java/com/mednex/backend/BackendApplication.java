@@ -2,10 +2,12 @@ package com.mednex.backend;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
 @EnableScheduling
+@EnableAsync
 public class BackendApplication {
 
     public static void main(String[] args) {
@@ -15,6 +17,7 @@ public class BackendApplication {
         System.out.println("📍 Port            : http://localhost:8082");
         System.out.println("📍 Health          : http://localhost:8082/api/health");
         System.out.println("📍 Auth Login      : POST /api/auth/login");
+        System.out.println("📍 Auth Register   : POST /api/auth/register");
         System.out.println("📍 Patients        : GET  /api/patients");
         System.out.println("📍 Medical Records : GET  /api/medical-records");
         System.out.println("📍 Appointments    : GET  /api/appointments");

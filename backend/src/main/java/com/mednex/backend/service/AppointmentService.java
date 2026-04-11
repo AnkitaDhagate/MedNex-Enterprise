@@ -15,6 +15,12 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * FIXED:
+ *  - Added deleteAppointment(Long id) — frontend calls DELETE /appointments/{id}
+ *  - Added getAppointmentsByDoctorAndDate(Long doctorId, LocalDate date) — frontend
+ *    calls GET /appointments/doctor/{id}?date=...
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -39,7 +45,6 @@ public class AppointmentService {
     public Appointment createAppointment(AppointmentDTO dto) {
         String tenantId = currentTenant();
 
-        // ── Week 3: Double-booking / conflict detection ──
         boolean conflict = appointmentRepository.existsConflict(
                 tenantId, dto.getDoctorId(),
                 dto.getAppointmentDate(), dto.getAppointmentTime(), 0L);
@@ -47,9 +52,9 @@ public class AppointmentService {
         if (conflict) {
             throw new RuntimeException(
                     "Conflict detected: Dr. " + dto.getDoctorName() +
-                            " is already booked on " + dto.getAppointmentDate() +
-                            " at " + dto.getAppointmentTime() +
-                            ". Please choose a different time slot.");
+                    " is already booked on " + dto.getAppointmentDate() +
+                    " at " + dto.getAppointmentTime() +
+                    ". Please choose a different time slot.");
         }
 
         Appointment appt = new Appointment();
@@ -60,12 +65,11 @@ public class AppointmentService {
 
         Appointment saved = appointmentRepository.save(appt);
 
-        // ── Week 3: Send confirmation email ──
         emailService.sendAppointmentConfirmation(saved);
         saved.setConfirmationSent(true);
         appointmentRepository.save(saved);
 
-        auditService.log(currentUser(), "CREATE", "APPOINTMENT",
+        auditService.log(tenantId, currentUser(), "CREATE", "APPOINTMENT",
                 String.valueOf(saved.getId()),
                 "Appointment booked for doctor " + dto.getDoctorId() + " on " + dto.getAppointmentDate());
 
@@ -96,6 +100,15 @@ public class AppointmentService {
         return appointmentRepository.findByDoctorIdAndTenantId(doctorId, currentTenant());
     }
 
+    /**
+     * ADDED: Filter by doctor + specific date.
+     * Frontend: appointmentAPI.getByDoctor(doctorId, date)
+     */
+    public List<Appointment> getAppointmentsByDoctorAndDate(Long doctorId, LocalDate date) {
+        String tenantId = currentTenant();
+        return appointmentRepository.findByDoctorIdAndTenantIdAndDate(doctorId, tenantId, date);
+    }
+
     @Transactional
     public Appointment updateAppointment(Long id, AppointmentDTO dto) {
         String tenantId = currentTenant();
@@ -103,7 +116,6 @@ public class AppointmentService {
                 .orElseThrow(() -> new RuntimeException("Appointment not found: " + id));
         if (!appt.getTenantId().equals(tenantId)) throw new RuntimeException("Cross-tenant access denied.");
 
-        // Re-check conflict only if date/time/doctor changed
         if (!appt.getAppointmentDate().equals(dto.getAppointmentDate()) ||
                 !appt.getAppointmentTime().equals(dto.getAppointmentTime()) ||
                 !appt.getDoctorId().equals(dto.getDoctorId())) {
@@ -112,14 +124,13 @@ public class AppointmentService {
                     tenantId, dto.getDoctorId(),
                     dto.getAppointmentDate(), dto.getAppointmentTime(), id);
             if (conflict) {
-                throw new RuntimeException(
-                        "Conflict detected: doctor already booked at that time.");
+                throw new RuntimeException("Conflict detected: doctor already booked at that time.");
             }
         }
 
         mapDtoToAppointment(dto, appt);
         Appointment saved = appointmentRepository.save(appt);
-        auditService.log(currentUser(), "UPDATE", "APPOINTMENT",
+        auditService.log(tenantId, currentUser(), "UPDATE", "APPOINTMENT",
                 String.valueOf(id), "Updated appointment: " + appt.getAppointmentId());
         return saved;
     }
@@ -132,15 +143,26 @@ public class AppointmentService {
         if (!appt.getTenantId().equals(tenantId)) throw new RuntimeException("Cross-tenant access denied.");
         appt.setStatus("CANCELLED");
         Appointment saved = appointmentRepository.save(appt);
-        auditService.log(currentUser(), "UPDATE", "APPOINTMENT",
+        auditService.log(tenantId, currentUser(), "UPDATE", "APPOINTMENT",
                 String.valueOf(id), "Cancelled appointment: " + appt.getAppointmentId());
         return saved;
     }
 
     /**
-     * Week 3 – Scheduled task: every day at 8 AM send reminders
-     * for appointments happening the next day.
+     * ADDED: Hard-delete appointment.
+     * Frontend: appointmentAPI.delete(id) → DELETE /appointments/{id}
      */
+    @Transactional
+    public void deleteAppointment(Long id) {
+        String tenantId = currentTenant();
+        Appointment appt = appointmentRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Appointment not found: " + id));
+        if (!appt.getTenantId().equals(tenantId)) throw new RuntimeException("Cross-tenant access denied.");
+        appointmentRepository.delete(appt);
+        auditService.log(tenantId, currentUser(), "DELETE", "APPOINTMENT",
+                String.valueOf(id), "Deleted appointment: " + appt.getAppointmentId());
+    }
+
     @Scheduled(cron = "0 0 8 * * *")
     public void sendDailyReminders() {
         LocalDate tomorrow = LocalDate.now().plusDays(1);

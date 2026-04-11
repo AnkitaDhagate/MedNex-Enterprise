@@ -21,12 +21,13 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
 
     List<Appointment> findByAppointmentDateAndTenantId(LocalDate date, String tenantId);
 
-    /**
-     * Week 3 — Simple slot conflict check:
-     * Returns true if the doctor already has a non-cancelled appointment
-     * at the exact same date+time in the same tenant (excluding the given id
-     * for update scenarios — pass 0L or null when creating).
-     */
+    /** ADDED: Filter by doctor + specific date — used by getAppointmentsByDoctorAndDate() */
+    @Query("SELECT a FROM Appointment a WHERE a.doctorId = :doctorId AND a.tenantId = :tenantId AND a.appointmentDate = :date ORDER BY a.appointmentTime")
+    List<Appointment> findByDoctorIdAndTenantIdAndDate(
+            @Param("doctorId") Long doctorId,
+            @Param("tenantId") String tenantId,
+            @Param("date") LocalDate date);
+
     @Query("SELECT COUNT(a) > 0 FROM Appointment a WHERE " +
             "a.tenantId = :tenantId AND " +
             "a.doctorId = :doctorId AND " +

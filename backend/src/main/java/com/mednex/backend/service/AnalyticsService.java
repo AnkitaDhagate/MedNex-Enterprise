@@ -13,6 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.*;
 
+/**
+ * ADDED: getDepartmentStats() for frontend analyticsAPI.getDepartmentStats()
+ */
 @Service
 @RequiredArgsConstructor
 public class AnalyticsService {
@@ -28,7 +31,6 @@ public class AnalyticsService {
         return t;
     }
 
-    /** Week 4: Bed Occupancy Rates for Angular Charts dashboard */
     public List<Map<String, Object>> getBedOccupancyRates() {
         String tenantId = currentTenant();
         List<BedOccupancy> records = bedOccupancyRepository
@@ -52,7 +54,6 @@ public class AnalyticsService {
         return result;
     }
 
-    /** Weekly trend – last 7 days occupancy data for line charts */
     public List<Map<String, Object>> getOccupancyTrend() {
         String tenantId = currentTenant();
         LocalDate to   = LocalDate.now();
@@ -84,7 +85,6 @@ public class AnalyticsService {
         return bedOccupancyRepository.save(b);
     }
 
-    /** Dashboard summary stats */
     public Map<String, Object> getDashboardStats() {
         String tenantId = currentTenant();
         Map<String, Object> stats = new LinkedHashMap<>();
@@ -98,17 +98,67 @@ public class AnalyticsService {
         return stats;
     }
 
-    /** Fallback synthetic data for demo when no DB records yet */
+    /**
+     * ADDED: Department-wise statistics for charts.
+     * Frontend: analyticsAPI.getDepartmentStats()
+     */
+    public List<Map<String, Object>> getDepartmentStats() {
+        // Uses the same bed occupancy data grouped by department,
+        // enriched with static doctor/staff counts for the demo.
+        List<Map<String, Object>> occupancy = getBedOccupancyRates();
+
+        // Static department metadata (extend with DB queries when available)
+        Map<String, int[]> meta = new LinkedHashMap<>();
+        meta.put("Cardiology",   new int[]{25, 12});
+        meta.put("Neurology",    new int[]{15, 8});
+        meta.put("Pediatrics",   new int[]{20, 10});
+        meta.put("Orthopedics",  new int[]{18, 9});
+        meta.put("Gynecology",   new int[]{12, 6});
+        meta.put("Emergency",    new int[]{30, 15});
+        meta.put("Oncology",     new int[]{14, 7});
+        meta.put("ICU",          new int[]{10, 20});
+        meta.put("General Ward", new int[]{40, 25});
+        meta.put("Maternity",    new int[]{10, 8});
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Map<String, Object> o : occupancy) {
+            String dept = (String) o.get("department");
+            Map<String, Object> entry = new LinkedHashMap<>(o);
+            int[] m = meta.getOrDefault(dept, new int[]{10, 5});
+            entry.put("doctorCount", m[0]);
+            entry.put("staffCount",  m[1]);
+            result.add(entry);
+        }
+
+        // Add departments that might not be in bed_occupancy yet
+        Set<String> present = new HashSet<>();
+        result.forEach(r -> present.add((String) r.get("department")));
+        for (Map.Entry<String, int[]> e : meta.entrySet()) {
+            if (!present.contains(e.getKey())) {
+                Map<String, Object> entry = new LinkedHashMap<>();
+                entry.put("department",    e.getKey());
+                entry.put("totalBeds",     0);
+                entry.put("occupiedBeds",  0);
+                entry.put("availableBeds", 0);
+                entry.put("occupancyRate", 0.0);
+                entry.put("doctorCount",   e.getValue()[0]);
+                entry.put("staffCount",    e.getValue()[1]);
+                result.add(entry);
+            }
+        }
+        return result;
+    }
+
     private List<Map<String, Object>> getDefaultBedOccupancy(String tenantId) {
         String[][] depts = {
-                {"ICU",            "20",  "18"},
-                {"General Ward",   "80",  "62"},
-                {"Pediatrics",     "30",  "21"},
-                {"Cardiology",     "25",  "20"},
-                {"Orthopedics",    "20",  "13"},
-                {"Maternity",      "15",  "11"},
-                {"Neurology",      "18",  "14"},
-                {"Oncology",       "22",  "17"},
+                {"ICU",          "20", "18"},
+                {"General Ward", "80", "62"},
+                {"Pediatrics",   "30", "21"},
+                {"Cardiology",   "25", "20"},
+                {"Orthopedics",  "20", "13"},
+                {"Maternity",    "15", "11"},
+                {"Neurology",    "18", "14"},
+                {"Oncology",     "22", "17"},
         };
         List<Map<String, Object>> result = new ArrayList<>();
         for (String[] d : depts) {

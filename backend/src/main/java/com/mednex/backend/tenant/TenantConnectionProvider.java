@@ -34,14 +34,14 @@ public class TenantConnectionProvider implements MultiTenantConnectionProvider {
                 env.getProperty("tenant.datasource.tenant_b.password"));
     }
 
-    private void registerTenant(String tenantId, String url,
-                                String username, String password) {
+    private void registerTenant(String tenantId, String url, String username, String password) {
         if (url == null || url.isBlank()) return;
+        // FIX: Use MySQL driver instead of PostgreSQL
         DataSource ds = DataSourceBuilder.create()
                 .url(url)
                 .username(username)
                 .password(password)
-                .driverClassName("org.postgresql.Driver")
+                .driverClassName("com.mysql.cj.jdbc.Driver")
                 .build();
         tenantDataSources.put(tenantId, ds);
     }
@@ -66,8 +66,7 @@ public class TenantConnectionProvider implements MultiTenantConnectionProvider {
     }
 
     @Override
-    public void releaseConnection(String tenantIdentifier,
-                                  Connection connection) throws SQLException {
+    public void releaseConnection(String tenantIdentifier, Connection connection) throws SQLException {
         connection.close();
     }
 
@@ -83,7 +82,6 @@ public class TenantConnectionProvider implements MultiTenantConnectionProvider {
 
     @Override
     public <T> T unwrap(Class<T> unwrapType) {
-        throw new UnsupportedOperationException(
-                "Cannot unwrap as " + unwrapType);
+        throw new UnsupportedOperationException("Cannot unwrap as " + unwrapType);
     }
 }

@@ -10,6 +10,12 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.Map;
 
+/**
+ * FIXED:
+ *  - Added DELETE /api/appointments/{id} (frontend calls appointmentAPI.delete(id))
+ *  - GET /api/appointments/doctor/{doctorId}?date=... now accepts optional date param
+ *    matching frontend: appointmentAPI.getByDoctor(doctorId, date)
+ */
 @RestController
 @RequestMapping("/api/appointments")
 @RequiredArgsConstructor
@@ -17,13 +23,11 @@ public class AppointmentController {
 
     private final AppointmentService appointmentService;
 
-    /** Create appointment with automatic conflict detection */
     @PostMapping
     public ResponseEntity<?> createAppointment(@RequestBody AppointmentDTO dto) {
         try {
             return ResponseEntity.ok(appointmentService.createAppointment(dto));
         } catch (RuntimeException e) {
-            // Conflict or validation error — return 409
             return ResponseEntity.status(409).body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -58,6 +62,7 @@ public class AppointmentController {
         }
     }
 
+    /** GET /api/appointments/patient/{patientId} — used by frontend: appointmentAPI.getByPatient(patientId) */
     @GetMapping("/patient/{patientId}")
     public ResponseEntity<?> getPatientAppointments(@PathVariable Long patientId) {
         try {
@@ -67,9 +72,19 @@ public class AppointmentController {
         }
     }
 
+    /**
+     * GET /api/appointments/doctor/{doctorId}?date=YYYY-MM-DD
+     * Frontend: appointmentAPI.getByDoctor(doctorId, date)
+     * date param is optional — if omitted returns all appointments for that doctor.
+     */
     @GetMapping("/doctor/{doctorId}")
-    public ResponseEntity<?> getDoctorAppointments(@PathVariable Long doctorId) {
+    public ResponseEntity<?> getDoctorAppointments(
+            @PathVariable Long doctorId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         try {
+            if (date != null) {
+                return ResponseEntity.ok(appointmentService.getAppointmentsByDoctorAndDate(doctorId, date));
+            }
             return ResponseEntity.ok(appointmentService.getAppointmentsByDoctor(doctorId));
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
@@ -91,6 +106,20 @@ public class AppointmentController {
     public ResponseEntity<?> cancelAppointment(@PathVariable Long id) {
         try {
             return ResponseEntity.ok(appointmentService.cancelAppointment(id));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * DELETE /api/appointments/{id}
+     * Frontend: appointmentAPI.delete(id)
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteAppointment(@PathVariable Long id) {
+        try {
+            appointmentService.deleteAppointment(id);
+            return ResponseEntity.ok(Map.of("message", "Appointment deleted successfully."));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }

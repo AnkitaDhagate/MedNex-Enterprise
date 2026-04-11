@@ -46,14 +46,16 @@ public class PatientService {
                     + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
         }
         Patient saved = patientRepository.save(p);
-        auditService.log(currentUser(), "CREATE", "PATIENT",
+        // FIX: Pass tenantId explicitly — @Async thread has no TenantContext
+        auditService.log(tenantId, currentUser(), "CREATE", "PATIENT",
                 String.valueOf(saved.getId()), "Created patient: " + saved.getFirstName() + " " + saved.getLastName());
         return saved;
     }
 
     public List<Patient> getAllPatients() {
         String tenantId = currentTenant();
-        auditService.log(currentUser(), "READ", "PATIENT", "ALL", "Fetched all patients for tenant: " + tenantId);
+        auditService.log(tenantId, currentUser(), "READ", "PATIENT", "ALL",
+                "Fetched all patients for tenant: " + tenantId);
         return patientRepository.findByTenantIdOrderByCreatedAtDesc(tenantId);
     }
 
@@ -64,7 +66,7 @@ public class PatientService {
         if (!p.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Cross-tenant access denied.");
         }
-        auditService.log(currentUser(), "READ", "PATIENT", String.valueOf(id),
+        auditService.log(tenantId, currentUser(), "READ", "PATIENT", String.valueOf(id),
                 "Viewed patient: " + p.getFirstName() + " " + p.getLastName());
         return p;
     }
@@ -84,7 +86,7 @@ public class PatientService {
         }
         mapDtoToPatient(dto, p);
         Patient saved = patientRepository.save(p);
-        auditService.log(currentUser(), "UPDATE", "PATIENT", String.valueOf(id),
+        auditService.log(tenantId, currentUser(), "UPDATE", "PATIENT", String.valueOf(id),
                 "Updated patient: " + saved.getFirstName() + " " + saved.getLastName());
         return saved;
     }
@@ -98,7 +100,7 @@ public class PatientService {
             throw new RuntimeException("Cross-tenant access denied.");
         }
         patientRepository.delete(p);
-        auditService.log(currentUser(), "DELETE", "PATIENT", String.valueOf(id), "Deleted patient.");
+        auditService.log(tenantId, currentUser(), "DELETE", "PATIENT", String.valueOf(id), "Deleted patient.");
     }
 
     public List<Patient> getRecentPatients() {

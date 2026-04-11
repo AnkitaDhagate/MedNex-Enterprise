@@ -1,15 +1,22 @@
 package com.mednex.backend.model;
 
-import io.hypersistence.utils.hibernate.type.json.JsonBinaryType;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.Type;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Map;
 
+/**
+ * FIX 5: Added missing fields that were in the schema but not in the model:
+ *  - treatmentPlan (was in DTO and DB schema but missing from model)
+ *  - followUpRequired, followUpDate, followUpInstructions
+ *  - disposition, referralNotes
+ *  - createdAt, updatedAt (needed for audit/ordering)
+ */
 @Entity
 @Table(name = "medical_records")
 @Data
@@ -49,66 +56,67 @@ public class MedicalRecord {
     @Column(name = "history_of_present_illness", columnDefinition = "TEXT")
     private String historyOfPresentIllness;
 
-    // ---- JSONB Medical Data (Week 2) ----
-    @Type(JsonBinaryType.class)
-    @Column(columnDefinition = "jsonb", name = "past_medical_history")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "json", name = "past_medical_history")
     private Map<String, Object> pastMedicalHistory;
 
-    @Type(JsonBinaryType.class)
-    @Column(columnDefinition = "jsonb", name = "family_history")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "json", name = "family_history")
     private Map<String, Object> familyHistory;
 
-    @Type(JsonBinaryType.class)
-    @Column(columnDefinition = "jsonb", name = "social_history")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "json", name = "social_history")
     private Map<String, Object> socialHistory;
 
-    @Type(JsonBinaryType.class)
-    @Column(columnDefinition = "jsonb", name = "vital_signs")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "json", name = "vital_signs")
     private Map<String, Object> vitalSigns;
 
     @Column(name = "physical_examination", columnDefinition = "TEXT")
     private String physicalExamination;
 
-    @Type(JsonBinaryType.class)
-    @Column(columnDefinition = "jsonb", name = "systemic_examination")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "json", name = "systemic_examination")
     private Map<String, Object> systemicExamination;
 
-    @Type(JsonBinaryType.class)
-    @Column(columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "json")
     private Map<String, Object> investigations;
 
-    @Type(JsonBinaryType.class)
-    @Column(columnDefinition = "jsonb", name = "radiology_reports")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "json", name = "radiology_reports")
     private Map<String, Object> radiologyReports;
 
-    @Type(JsonBinaryType.class)
-    @Column(columnDefinition = "jsonb", name = "other_diagnostics")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "json", name = "other_diagnostics")
     private Map<String, Object> otherDiagnostics;
 
     @Column(name = "primary_diagnosis", columnDefinition = "TEXT")
     private String primaryDiagnosis;
 
-    @Type(JsonBinaryType.class)
-    @Column(columnDefinition = "jsonb", name = "secondary_diagnosis")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "json", name = "secondary_diagnosis")
     private Map<String, Object> secondaryDiagnosis;
 
-    @Type(JsonBinaryType.class)
-    @Column(columnDefinition = "jsonb", name = "icd_codes")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "json", name = "icd_codes")
     private Map<String, Object> icdCodes;
 
+    /** FIX 5: Was present in MedicalRecordDTO and DB schema but MISSING from model */
     @Column(name = "treatment_plan", columnDefinition = "TEXT")
     private String treatmentPlan;
 
-    @Type(JsonBinaryType.class)
-    @Column(columnDefinition = "jsonb", name = "medications_prescribed")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "json", name = "medications_prescribed")
     private Map<String, Object> medicationsPrescribed;
 
-    @Type(JsonBinaryType.class)
-    @Column(columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "json")
     private Map<String, Object> procedures;
 
+    /** FIX 5: Missing from original model */
     @Column(name = "follow_up_required")
-    private Boolean followUpRequired;
+    private Boolean followUpRequired = false;
 
     @Column(name = "follow_up_date")
     private LocalDate followUpDate;
@@ -116,13 +124,27 @@ public class MedicalRecord {
     @Column(name = "follow_up_instructions", columnDefinition = "TEXT")
     private String followUpInstructions;
 
+    /** FIX 5: Missing from original model */
+    @Column(name = "disposition")
     private String disposition;
 
     @Column(name = "referral_notes", columnDefinition = "TEXT")
     private String referralNotes;
 
+    @Column(name = "is_confidential")
+    private Boolean isConfidential = false;
+
+    @Column(name = "access_count")
+    private Integer accessCount = 0;
+
+    @Column(name = "created_by")
+    private Long createdBy;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
+
+    @Column(name = "updated_by")
+    private Long updatedBy;
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
@@ -131,7 +153,6 @@ public class MedicalRecord {
     public void prePersist() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
-        if (this.encounterDate == null) this.encounterDate = LocalDateTime.now();
     }
 
     @PreUpdate

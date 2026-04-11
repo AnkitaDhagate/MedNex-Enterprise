@@ -12,6 +12,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * FIX 5: mapDtoToRecord() now maps ALL fields from MedicalRecordDTO,
+ * including the previously missing: treatmentPlan, followUpRequired,
+ * followUpDate, followUpInstructions, disposition, referralNotes.
+ */
 @Service
 @RequiredArgsConstructor
 public class MedicalRecordService {
@@ -40,15 +45,20 @@ public class MedicalRecordService {
             rec.setRecordId("REC-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
         }
         MedicalRecord saved = medicalRecordRepository.save(rec);
-        auditService.log(currentUser(), "CREATE", "MEDICAL_RECORD",
+        auditService.log(tenantId, currentUser(), "CREATE", "MEDICAL_RECORD",
                 String.valueOf(saved.getId()),
                 "Created record for patient: " + dto.getPatientId());
         return saved;
     }
 
+    public List<MedicalRecord> getAllRecords() {
+        String tenantId = currentTenant();
+        return medicalRecordRepository.findByTenantIdOrderByCreatedAtDesc(tenantId);
+    }
+
     public List<MedicalRecord> getPatientMedicalRecords(Long patientId) {
         String tenantId = currentTenant();
-        auditService.log(currentUser(), "READ", "MEDICAL_RECORD",
+        auditService.log(tenantId, currentUser(), "READ", "MEDICAL_RECORD",
                 String.valueOf(patientId),
                 "Fetched medical records for patient: " + patientId);
         return medicalRecordRepository
@@ -59,10 +69,9 @@ public class MedicalRecordService {
         String tenantId = currentTenant();
         MedicalRecord rec = medicalRecordRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Medical record not found: " + id));
-        if (!rec.getTenantId().equals(tenantId)) {
+        if (!rec.getTenantId().equals(tenantId))
             throw new RuntimeException("Cross-tenant access denied.");
-        }
-        auditService.log(currentUser(), "READ", "MEDICAL_RECORD",
+        auditService.log(tenantId, currentUser(), "READ", "MEDICAL_RECORD",
                 String.valueOf(id), "Viewed record: " + rec.getRecordId());
         return rec;
     }
@@ -72,21 +81,35 @@ public class MedicalRecordService {
         String tenantId = currentTenant();
         MedicalRecord rec = medicalRecordRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Medical record not found: " + id));
-        if (!rec.getTenantId().equals(tenantId)) {
+        if (!rec.getTenantId().equals(tenantId))
             throw new RuntimeException("Cross-tenant access denied.");
-        }
         mapDtoToRecord(dto, rec);
         MedicalRecord saved = medicalRecordRepository.save(rec);
-        auditService.log(currentUser(), "UPDATE", "MEDICAL_RECORD",
+        auditService.log(tenantId, currentUser(), "UPDATE", "MEDICAL_RECORD",
                 String.valueOf(id), "Updated record: " + rec.getRecordId());
         return saved;
     }
 
-    public List<MedicalRecord> getAllRecords() {
-        return medicalRecordRepository.findByTenantIdOrderByCreatedAtDesc(currentTenant());
+    @Transactional
+    public void deleteMedicalRecord(Long id) {
+        String tenantId = currentTenant();
+        MedicalRecord rec = medicalRecordRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Medical record not found: " + id));
+        if (!rec.getTenantId().equals(tenantId))
+            throw new RuntimeException("Cross-tenant access denied.");
+        medicalRecordRepository.delete(rec);
+        auditService.log(tenantId, currentUser(), "DELETE", "MEDICAL_RECORD",
+                String.valueOf(id), "Deleted medical record.");
     }
 
+    /**
+     * FIX 5: Complete DTO → Entity mapping.
+     * Original code was missing: treatmentPlan, followUpRequired, followUpDate,
+     * followUpInstructions, disposition, referralNotes.
+     * These fields exist in the DB schema and DTO but were never persisted.
+     */
     private void mapDtoToRecord(MedicalRecordDTO dto, MedicalRecord rec) {
+        if (dto.getRecordId() != null)                  rec.setRecordId(dto.getRecordId());
         rec.setPatientId(dto.getPatientId());
         rec.setDoctorId(dto.getDoctorId());
         rec.setAppointmentId(dto.getAppointmentId());
@@ -107,10 +130,11 @@ public class MedicalRecordService {
         rec.setPrimaryDiagnosis(dto.getPrimaryDiagnosis());
         rec.setSecondaryDiagnosis(dto.getSecondaryDiagnosis());
         rec.setIcdCodes(dto.getIcdCodes());
+        // FIX 5: These were silently dropped before
         rec.setTreatmentPlan(dto.getTreatmentPlan());
         rec.setMedicationsPrescribed(dto.getMedicationsPrescribed());
         rec.setProcedures(dto.getProcedures());
-        rec.setFollowUpRequired(dto.getFollowUpRequired());
+        rec.setFollowUpRequired(dto.getFollowUpRequired() != null ? dto.getFollowUpRequired() : false);
         rec.setFollowUpDate(dto.getFollowUpDate());
         rec.setFollowUpInstructions(dto.getFollowUpInstructions());
         rec.setDisposition(dto.getDisposition());

@@ -1,54 +1,29 @@
 package com.mednex.backend.model;
 
-import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "users")
+/**
+ * @deprecated Use {@link com.mednex.backend.entity.User} instead.
+ * This class is kept for legacy service references only and is NOT a JPA entity.
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class User {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(nullable = false, unique = true)
     private String username;
-
-    @Column(nullable = false)
     private String password;
-
-    @Column(nullable = false)
     private String email;
-
-    @Column(name = "first_name")
     private String firstName;
-
-    @Column(name = "last_name")
     private String lastName;
-
-    @Column(name = "tenant_id", nullable = false)
     private String tenantId;
-
-    private String role; // ADMIN, DOCTOR, NURSE, RECEPTIONIST
-
-    @Column(name = "is_active")
+    private String role;
     private Boolean isActive = true;
-
-    @Column(name = "created_at")
     private LocalDateTime createdAt;
-
-    @Column(name = "last_login")
     private LocalDateTime lastLogin;
-
-    @PrePersist
-    public void prePersist() {
-        this.createdAt = LocalDateTime.now();
-    }
 }

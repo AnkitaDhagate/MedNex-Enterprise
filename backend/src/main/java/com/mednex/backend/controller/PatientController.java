@@ -10,6 +10,10 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * FIXED: Search param was "term" in backend but frontend sends "q".
+ * Added support for both: ?q=... and ?term=...
+ */
 @RestController
 @RequestMapping("/api/patients")
 @RequiredArgsConstructor
@@ -44,10 +48,18 @@ public class PatientController {
         }
     }
 
+    /**
+     * FIXED: Frontend sends ?q=... but original backend expected ?term=...
+     * Now accepts both: ?q= and ?term= (q takes priority if both provided)
+     * Frontend: patientAPI.search(query) → GET /patients/search?q={query}
+     */
     @GetMapping("/search")
-    public ResponseEntity<?> searchPatients(@RequestParam String term) {
+    public ResponseEntity<?> searchPatients(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String term) {
         try {
-            List<Patient> patients = patientService.searchPatients(term);
+            String searchTerm = (q != null && !q.isBlank()) ? q : (term != null ? term : "");
+            List<Patient> patients = patientService.searchPatients(searchTerm);
             return ResponseEntity.ok(patients);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));

@@ -14,29 +14,24 @@ public class TenantInterceptor implements HandlerInterceptor {
     public boolean preHandle(HttpServletRequest request,
                              HttpServletResponse response,
                              Object handler) {
-
-        // Read tenant from request header
-        String tenantId = request.getHeader("X-Tenant-ID");
-
-        if (tenantId != null && !tenantId.isBlank()) {
-            TenantContext.setCurrentTenant(tenantId.toLowerCase());
-            log.debug("Tenant set to: {}", tenantId);
-        } else {
-            // Default tenant if header missing
-            TenantContext.setCurrentTenant("tenant_a");
-            log.debug("No X-Tenant-ID header found, defaulting to tenant_a");
+        // FIX: Only set tenant if TenantFilter hasn't already done so.
+        // TenantFilter (Order 1) runs before this interceptor and sets the tenant.
+        // We should not overwrite it here, only fill in as a fallback.
+        String existing = TenantContext.getCurrentTenant();
+        if (existing == null || existing.isBlank()) {
+            String tenantId = request.getHeader("X-Tenant-ID");
+            String resolved = (tenantId != null && !tenantId.isBlank())
+                    ? tenantId.toLowerCase().trim()
+                    : "tenant_a";
+            TenantContext.setCurrentTenant(resolved);
+            log.debug("TenantInterceptor fallback: tenant set to {}", resolved);
         }
-
-        return true; // continue request
+        return true;
     }
 
-    @Override
-    public void afterCompletion(HttpServletRequest request,
-                                HttpServletResponse response,
-                                Object handler,
-                                Exception ex) {
-        // Always clear tenant after request to avoid thread leak
-        TenantContext.clear();
-        log.debug("Tenant context cleared after request");
-    }
+    // FIX: afterCompletion is intentionally removed.
+    // TenantFilter's finally block already calls TenantContext.clear().
+    // If afterCompletion also called clear(), it would wipe the context
+    // AFTER the filter set it for the next request on a reused thread,
+    // causing the next transaction to open with a null tenant identifier.
 }

@@ -1,0 +1,54 @@
+/* Patients.css */
+.patients-page { display:flex; flex-direction:column; gap:18px; animation:fadeIn 0.3s ease; }
+
+/* Banner */
+.patients-banner {
+  display:flex; align-items:center; gap:20px; padding:22px 28px;
+  background:linear-gradient(135deg,rgba(0,212,255,0.07),rgba(0,229,160,0.05));
+  border:1px solid var(--border); border-radius:var(--radius);
+  flex-wrap:wrap; position:relative; overflow:hidden;
+}
+.patients-banner::after {
+  content:''; position:absolute; right:-40px; top:-40px;
+  width:200px; height:200px;
+  background:radial-gradient(circle,rgba(0,212,255,0.08),transparent 70%);
+  pointer-events:none;
+}
+.banner-left { display:flex; align-items:center; gap:16px; flex:1; min-width:200px; }
+.banner-icon { font-size:36px; }
+.banner-left h1 { font-size:20px; font-weight:800; color:var(--text-primary); margin-bottom:4px; }
+.banner-left p  { font-size:12px; color:var(--text-muted); }
+
+.banner-stats { display:flex; gap:20px; }
+.bs-item { text-align:center; }
+.bs-val { font-size:24px; font-weight:800; color:var(--text-primary); line-height:1; }
+.bs-item.bs-active .bs-val { color:var(--emerald); }
+.bs-lbl { font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-top:3px; }
+
+/* Toolbar */
+.result-badge {
+  background:rgba(0,212,255,0.08); border:1px solid rgba(0,212,255,0.15);
+  color:var(--cyan); padding:5px 14px; border-radius:20px;
+  font-size:12px; font-weight:700; white-space:nowrap;
+}
+
+/* Table */
+.patient-row { cursor:default; }
+
+.pid-badge {
+  background:rgba(0,212,255,0.08); color:var(--cyan);
+  padding:3px 9px; border-radius:5px; font-size:11px;
+  font-family:'JetBrains Mono',monospace; font-weight:600;
+  border:1px solid rgba(0,212,255,0.15);
+}
+
+.blood-badge {
+  background:rgba(244,63,94,0.1); color:var(--rose);
+  border:1px solid rgba(244,63,94,0.2);
+  padding:3px 9px; border-radius:5px; font-size:12px; font-weight:700;
+}
+
+@media (max-width:900px) {
+  .patients-banner { flex-direction:column; align-items:flex-start; }
+  .banner-stats { width:100%; justify-content:space-between; }
+}

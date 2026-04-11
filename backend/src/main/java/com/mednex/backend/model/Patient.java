@@ -1,10 +1,10 @@
 package com.mednex.backend.model;
 
-import io.hypersistence.utils.hibernate.type.json.JsonBinaryType;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.Type;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -74,33 +74,37 @@ public class Patient {
 
     private String religion;
 
-    // ---- Medical History (JSONB) ----
-    @Type(JsonBinaryType.class)
-    @Column(columnDefinition = "jsonb", name = "medical_history")
+    // ---- Medical History (JSON) ----
+    // FIX: Replaced @Type(JsonBinaryType.class) + "jsonb" with @JdbcTypeCode(SqlTypes.JSON) + "json"
+    // JsonBinaryType is a PostgreSQL-only type. MySQL uses standard JSON columns
+    // which are natively supported by Hibernate 6 via @JdbcTypeCode(SqlTypes.JSON).
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "json", name = "medical_history")
     private Map<String, Object> medicalHistory;
 
-    @Type(JsonBinaryType.class)
-    @Column(columnDefinition = "jsonb", name = "current_medications")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "json", name = "current_medications")
     private Map<String, Object> currentMedications;
 
-    @Type(JsonBinaryType.class)
-    @Column(columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "json")
     private Map<String, Object> allergies;
 
-    @Type(JsonBinaryType.class)
-    @Column(columnDefinition = "jsonb", name = "chronic_conditions")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "json", name = "chronic_conditions")
     private Map<String, Object> chronicConditions;
 
-    @Type(JsonBinaryType.class)
-    @Column(columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "json")
     private Map<String, Object> immunizations;
 
-    @Type(JsonBinaryType.class)
-    @Column(columnDefinition = "jsonb", name = "family_history")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "json", name = "family_history")
     private Map<String, Object> familyHistory;
 
-    @Type(JsonBinaryType.class)
-    @Column(columnDefinition = "jsonb", name = "lifestyle_factors")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "json", name = "lifestyle_factors")
     private Map<String, Object> lifestyleFactors;
 
     // ---- Emergency Contact ----
@@ -129,8 +133,8 @@ public class Patient {
     @Column(name = "insurance_valid_to")
     private LocalDate insuranceValidTo;
 
-    @Type(JsonBinaryType.class)
-    @Column(columnDefinition = "jsonb", name = "insurance_details")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "json", name = "insurance_details")
     private Map<String, Object> insuranceDetails;
 
     // ---- Doctor ----
