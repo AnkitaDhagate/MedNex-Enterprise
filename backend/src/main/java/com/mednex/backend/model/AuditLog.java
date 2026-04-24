@@ -4,18 +4,14 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import com.fasterxml.jackson.annotation.JsonProperty;
-
 import java.time.LocalDateTime;
 
 /**
- * FIXED: Added @JsonProperty aliases so the React frontend receives the field
- * names it expects: entityType, entityId, details.
- *
- * Backend stores: resourceType, resourceId, description
- * Frontend reads: entityType,  entityId,   details
- *
- * Both names are now serialized — the frontend names as primary, the backend
- * names kept via getters so existing service code compiles unchanged.
+ * FIXED:
+ * 1. @Column name = "resource_type"  → "entity_type"  (matches Schema.sql)
+ * 2. @Column name = "resource_id"    → "entity_id"    (matches Schema.sql)
+ * 3. @Column name = "timestamp"      → "created_at"   (matches Schema.sql)
+ * 4. user_id is nullable (system/async logs may have no user)
  */
 @Entity
 @Table(name = "audit_logs")
@@ -36,15 +32,13 @@ public class AuditLog {
     @Column(name = "username")
     private String username;
 
-    /** READ, CREATE, UPDATE, DELETE, LOGIN, LOGOUT, EXPORT */
     @Column(name = "action", nullable = false)
     private String action;
 
-    /** PATIENT, MEDICAL_RECORD, APPOINTMENT, USER */
-    @Column(name = "resource_type")
+    @Column(name = "entity_type")
     private String resourceType;
 
-    @Column(name = "resource_id")
+    @Column(name = "entity_id")
     private String resourceId;
 
     @Column(name = "description", columnDefinition = "TEXT")
@@ -56,31 +50,20 @@ public class AuditLog {
     @Column(name = "user_agent", columnDefinition = "TEXT")
     private String userAgent;
 
-    @Column(name = "timestamp", nullable = false)
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime timestamp;
 
     @Column(name = "success")
     private Boolean success = true;
 
-    // ── Frontend-facing aliases ──────────────────────────────────────────────
-
-    /** Alias: frontend reads 'entityType' */
     @JsonProperty("entityType")
-    public String getEntityType() {
-        return resourceType;
-    }
+    public String getEntityType() { return resourceType; }
 
-    /** Alias: frontend reads 'entityId' */
     @JsonProperty("entityId")
-    public String getEntityId() {
-        return resourceId;
-    }
+    public String getEntityId() { return resourceId; }
 
-    /** Alias: frontend reads 'details' */
     @JsonProperty("details")
-    public String getDetails() {
-        return description;
-    }
+    public String getDetails() { return description; }
 
     @PrePersist
     public void prePersist() {

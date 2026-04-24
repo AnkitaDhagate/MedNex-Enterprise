@@ -5,6 +5,7 @@ import com.mednex.backend.model.MedicalRecord;
 import com.mednex.backend.repository.MedicalRecordRepository;
 import com.mednex.backend.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,13 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * FIX 5: mapDtoToRecord() now maps ALL fields from MedicalRecordDTO,
- * including the previously missing: treatmentPlan, followUpRequired,
- * followUpDate, followUpInstructions, disposition, referralNotes.
- */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class MedicalRecordService {
 
     private final MedicalRecordRepository medicalRecordRepository;
@@ -31,8 +28,10 @@ public class MedicalRecordService {
     }
 
     private String currentUser() {
-        try { return SecurityContextHolder.getContext().getAuthentication().getName(); }
-        catch (Exception e) { return "system"; }
+        try {
+            String p = SecurityContextHolder.getContext().getAuthentication().getName();
+            return (p != null && p.contains("::")) ? p.split("::")[0] : (p != null ? p : "system");
+        } catch (Exception e) { return "system"; }
     }
 
     @Transactional
@@ -46,33 +45,27 @@ public class MedicalRecordService {
         }
         MedicalRecord saved = medicalRecordRepository.save(rec);
         auditService.log(tenantId, currentUser(), "CREATE", "MEDICAL_RECORD",
-                String.valueOf(saved.getId()),
-                "Created record for patient: " + dto.getPatientId());
+                String.valueOf(saved.getId()), "Created record for patient: " + dto.getPatientId());
         return saved;
     }
 
+    @Transactional(readOnly = true)
     public List<MedicalRecord> getAllRecords() {
-        String tenantId = currentTenant();
-        return medicalRecordRepository.findByTenantIdOrderByCreatedAtDesc(tenantId);
+        return medicalRecordRepository.findByTenantIdOrderByCreatedAtDesc(currentTenant());
     }
 
+    @Transactional(readOnly = true)
     public List<MedicalRecord> getPatientMedicalRecords(Long patientId) {
         String tenantId = currentTenant();
-        auditService.log(tenantId, currentUser(), "READ", "MEDICAL_RECORD",
-                String.valueOf(patientId),
-                "Fetched medical records for patient: " + patientId);
-        return medicalRecordRepository
-                .findByPatientIdAndTenantIdOrderByEncounterDateDesc(patientId, tenantId);
+        return medicalRecordRepository.findByPatientIdAndTenantIdOrderByEncounterDateDesc(patientId, tenantId);
     }
 
+    @Transactional(readOnly = true)
     public MedicalRecord getMedicalRecord(Long id) {
         String tenantId = currentTenant();
         MedicalRecord rec = medicalRecordRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Medical record not found: " + id));
-        if (!rec.getTenantId().equals(tenantId))
-            throw new RuntimeException("Cross-tenant access denied.");
-        auditService.log(tenantId, currentUser(), "READ", "MEDICAL_RECORD",
-                String.valueOf(id), "Viewed record: " + rec.getRecordId());
+        if (!rec.getTenantId().equals(tenantId)) throw new RuntimeException("Access denied.");
         return rec;
     }
 
@@ -81,8 +74,7 @@ public class MedicalRecordService {
         String tenantId = currentTenant();
         MedicalRecord rec = medicalRecordRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Medical record not found: " + id));
-        if (!rec.getTenantId().equals(tenantId))
-            throw new RuntimeException("Cross-tenant access denied.");
+        if (!rec.getTenantId().equals(tenantId)) throw new RuntimeException("Access denied.");
         mapDtoToRecord(dto, rec);
         MedicalRecord saved = medicalRecordRepository.save(rec);
         auditService.log(tenantId, currentUser(), "UPDATE", "MEDICAL_RECORD",
@@ -95,21 +87,14 @@ public class MedicalRecordService {
         String tenantId = currentTenant();
         MedicalRecord rec = medicalRecordRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Medical record not found: " + id));
-        if (!rec.getTenantId().equals(tenantId))
-            throw new RuntimeException("Cross-tenant access denied.");
+        if (!rec.getTenantId().equals(tenantId)) throw new RuntimeException("Access denied.");
         medicalRecordRepository.delete(rec);
         auditService.log(tenantId, currentUser(), "DELETE", "MEDICAL_RECORD",
                 String.valueOf(id), "Deleted medical record.");
     }
 
-    /**
-     * FIX 5: Complete DTO → Entity mapping.
-     * Original code was missing: treatmentPlan, followUpRequired, followUpDate,
-     * followUpInstructions, disposition, referralNotes.
-     * These fields exist in the DB schema and DTO but were never persisted.
-     */
     private void mapDtoToRecord(MedicalRecordDTO dto, MedicalRecord rec) {
-        if (dto.getRecordId() != null)                  rec.setRecordId(dto.getRecordId());
+        if (dto.getRecordId() != null) rec.setRecordId(dto.getRecordId());
         rec.setPatientId(dto.getPatientId());
         rec.setDoctorId(dto.getDoctorId());
         rec.setAppointmentId(dto.getAppointmentId());
@@ -130,7 +115,6 @@ public class MedicalRecordService {
         rec.setPrimaryDiagnosis(dto.getPrimaryDiagnosis());
         rec.setSecondaryDiagnosis(dto.getSecondaryDiagnosis());
         rec.setIcdCodes(dto.getIcdCodes());
-        // FIX 5: These were silently dropped before
         rec.setTreatmentPlan(dto.getTreatmentPlan());
         rec.setMedicationsPrescribed(dto.getMedicationsPrescribed());
         rec.setProcedures(dto.getProcedures());

@@ -1,8 +1,13 @@
-// src/services/api.js — FIXED to match backend endpoints exactly
+// src/services/api.js — FIXED
 import axios from 'axios';
 
 // ============================================================
 // Axios instance
+// FIX: baseURL must match backend:
+//   - server.port = 8082
+//   - server.servlet.context-path = /api
+//   So correct base is: http://localhost:8082/api
+//   All endpoint calls like /patients, /appointments are appended to this.
 // ============================================================
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8082/api',
@@ -10,32 +15,31 @@ const api = axios.create({
   timeout: 30000,
 });
 
-// ── Request interceptor: attach JWT + X-Tenant-ID ──────────────────────────
+// ── Request interceptor: attach JWT + X-Tenant-ID ──────────────
 api.interceptors.request.use(
   (config) => {
     const token    = localStorage.getItem('mednex_token');
     const user     = tokenHelper.getUser();
-    // FIX 1: tenantId from user object (HOSP_A, HOSP_B, HOSP_C)
-    // TenantFilter maps these to internal datasource keys
     const tenantId = user?.tenantId
       || localStorage.getItem('mednex_tenant')
       || 'HOSP_A';
 
     if (token) config.headers.Authorization = `Bearer ${token}`;
+
+    // FIX: Always send X-Tenant-ID header — TenantFilter requires it
     config.headers['X-Tenant-ID'] = tenantId;
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// ── Response interceptor: global 401 handler ──────────────────────────────
+// ── Response interceptor: global 401 handler ──────────────────
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('mednex_token');
-      localStorage.removeItem('mednex_refresh_token');
-      localStorage.removeItem('mednex_user');
+      tokenHelper.clear();
+      localStorage.removeItem('mednex_tenant');
       window.location.href = '/login';
     }
     return Promise.reject(error);
@@ -77,14 +81,8 @@ export const authAPI = {
     return response.data;
   },
 
-  /**
-   * FIX 4: Added missing logout method.
-   * AuthContext.js was calling authAPI.logout() which caused TypeError.
-   * Since backend is stateless JWT, logout just needs to exist and not throw.
-   */
   logout: async () => {
-    // Backend is stateless (JWT). No server-side logout needed.
-    // Just return resolved so AuthContext can clear local storage.
+    // Stateless JWT — just resolve. Local state cleared by caller.
     return Promise.resolve({ success: true });
   },
 };
@@ -93,13 +91,13 @@ export const authAPI = {
 // Patient API
 // ============================================================
 export const patientAPI = {
-  getAll:   async ()         => api.get('/patients'),
-  getById:  async (id)       => api.get(`/patients/${id}`),
-  create:   async (data)     => api.post('/patients', data),
-  update:   async (id, data) => api.put(`/patients/${id}`, data),
-  delete:   async (id)       => api.delete(`/patients/${id}`),
-  search:   async (query)    => api.get(`/patients/search?q=${encodeURIComponent(query)}`),
-  getRecent: async ()        => api.get('/patients/recent'),
+  getAll:    async ()         => api.get('/patients'),
+  getById:   async (id)       => api.get(`/patients/${id}`),
+  create:    async (data)     => api.post('/patients', data),
+  update:    async (id, data) => api.put(`/patients/${id}`, data),
+  delete:    async (id)       => api.delete(`/patients/${id}`),
+  search:    async (query)    => api.get(`/patients/search?q=${encodeURIComponent(query)}`),
+  getRecent: async ()         => api.get('/patients/recent'),
 };
 
 // ============================================================
@@ -140,34 +138,28 @@ export const medicalRecordAPI = {
 // Analytics API
 // ============================================================
 export const analyticsAPI = {
-  getBedOccupancy:   async () => api.get('/analytics/bed-occupancy'),
-  getTrend:          async () => api.get('/analytics/trend'),
-  getSummary:        async () => api.get('/analytics/summary'),
-  getDepartmentStats:async () => api.get('/analytics/departments'),
+  getBedOccupancy:    async () => api.get('/analytics/bed-occupancy'),
+  getTrend:           async () => api.get('/analytics/trend'),
+  getSummary:         async () => api.get('/analytics/summary'),
+  getDepartmentStats: async () => api.get('/analytics/departments'),
 };
 
 // ============================================================
 // Export API (PDF download)
 // ============================================================
 export const exportAPI = {
-  exportPatientPDF:      async (patientId)    => api.get(`/export/patient/${patientId}`, { responseType: 'blob' }),
-  exportMedicalRecordPDF:async (recordId)     => api.get(`/export/record/${recordId}`,   { responseType: 'blob' }),
-  exportAppointmentPDF:  async (appointmentId)=> api.get(`/export/appointment/${appointmentId}`, { responseType: 'blob' }),
+  exportPatientPDF:       async (patientId)     => api.get(`/export/patient/${patientId}`,       { responseType: 'blob' }),
+  exportMedicalRecordPDF: async (recordId)      => api.get(`/export/record/${recordId}`,         { responseType: 'blob' }),
+  exportAppointmentPDF:   async (appointmentId) => api.get(`/export/appointment/${appointmentId}`,{ responseType: 'blob' }),
 };
 
 // ============================================================
 // Audit API
 // ============================================================
 export const auditAPI = {
-  /**
-   * FIX 3: GET /api/audit/logs now returns a flat array (List<AuditLog>).
-   * Backend was returning Page<AuditLog> which has { content: [], ... } structure.
-   * AuditLogController was fixed to return getContent() list.
-   * Frontend can now directly use r.data as an array.
-   */
-  getLogs:        async (page = 0, size = 200) => api.get(`/audit/logs?page=${page}&size=${size}`),
-  getLogsByUser:  async (userId)               => api.get(`/audit/logs/user/${userId}`),
-  getLogsByEntity:async (entityType, entityId) => api.get(`/audit/logs/entity/${entityType}/${entityId}`),
+  getLogs:         async (page = 0, size = 200) => api.get(`/audit/logs?page=${page}&size=${size}`),
+  getLogsByUser:   async (userId)               => api.get(`/audit/logs/user/${userId}`),
+  getLogsByEntity: async (entityType, entityId) => api.get(`/audit/logs/entity/${entityType}/${entityId}`),
 };
 
 // ============================================================
@@ -203,6 +195,7 @@ export const tokenHelper = {
     localStorage.removeItem('mednex_token');
     localStorage.removeItem('mednex_refresh_token');
     localStorage.removeItem('mednex_user');
+    localStorage.removeItem('mednex_tenant');
   },
   getToken:   () => localStorage.getItem('mednex_token'),
   getUser:    () => {

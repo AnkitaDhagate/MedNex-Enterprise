@@ -1,102 +1,141 @@
-// src/pages/PatientForm.js
-import React, { useState, useEffect } from 'react';
-import { patientAPI } from '../services/api';
+// src/pages/PatientForm.js — FIXED: primaryDoctorId is a searchable dropdown (not raw number input)
+import React, { useState, useEffect, useRef } from 'react';
+import { patientAPI, hospitalAPI } from '../services/api';
 import { toast } from 'react-toastify';
 import './PatientForm.css';
-
-/**
- * FIXES applied (matched to PatientDTO.java):
- * 1. REMOVED profilePhotoUrl — not in PatientDTO → caused Jackson 400 "Unrecognized field"
- * 2. REMOVED emergencyContactAlternate — not in PatientDTO (Patient model has it but DTO + mapDtoToPatient don't)
- * 3. bloodGroup: backend returns BloodGroup enum as {dbValue:"O+"} — resolveBloodGroup() handles this
- * 4. JSON fields (medicalHistory etc.) kept as strings in state, parsed to objects on submit
- * 5. insuranceDetails: same JSON parse treatment
- * 6. Empty date strings sent as null (backend LocalDate rejects "")
- * 7. primaryDoctorId sent as number (Long), not string
- */
 
 const TABS      = ['Personal', 'Contact', 'Medical', 'Emergency', 'Insurance'];
 const TAB_ICONS = ['👤', '📍', '🏥', '🆘', '🛡'];
 
 const EMPTY = {
   patientId: '',
-  firstName: '',
-  lastName: '',
-  middleName: '',
-  dateOfBirth: '',
-  gender: '',
-  bloodGroup: '',
-  nationality: '',
-  occupation: '',
-  maritalStatus: '',
-  religion: '',
-  email: '',
-  phone: '',
-  mobile: '',
-  alternatePhone: '',
-  addressLine1: '',
-  addressLine2: '',
-  city: '',
-  state: '',
-  postalCode: '',
-  country: 'India',
-  // Emergency (PatientDTO fields only)
-  emergencyContactName: '',
-  emergencyContactRelationship: '',
-  emergencyContactPhone: '',
-  // Insurance
-  insuranceProvider: '',
-  insurancePolicyNumber: '',
-  insuranceGroupNumber: '',
-  insuranceValidFrom: '',
-  insuranceValidTo: '',
-  // Admin
-  primaryDoctorId: '',
+  firstName: '', lastName: '', middleName: '',
+  dateOfBirth: '', gender: '', bloodGroup: '',
+  nationality: '', occupation: '', maritalStatus: '', religion: '',
+  email: '', phone: '', mobile: '', alternatePhone: '',
+  addressLine1: '', addressLine2: '', city: '', state: '',
+  postalCode: '', country: 'India',
+  emergencyContactName: '', emergencyContactRelationship: '',
+  emergencyContactPhone: '', emergencyContactAlternate: '',
+  insuranceProvider: '', insurancePolicyNumber: '',
+  insuranceGroupNumber: '', insuranceValidFrom: '', insuranceValidTo: '',
+  insuranceDetails: null,
+  primaryDoctorId: null,
   primaryDoctorName: '',
   patientStatus: 'ACTIVE',
   registrationDate: '',
   registrationType: 'OPD',
   notes: '',
-  // JSON fields (string in state → parsed to object on submit)
-  medicalHistory: '{}',
-  currentMedications: '{}',
-  allergies: '{}',
-  chronicConditions: '{}',
-  immunizations: '{}',
-  familyHistory: '{}',
-  lifestyleFactors: '{}',
-  insuranceDetails: '{}',
+  profilePhotoUrl: '',
+  medicalHistory: '{}', currentMedications: '{}', allergies: '{}',
+  chronicConditions: '{}', immunizations: '{}', familyHistory: '{}', lifestyleFactors: '{}',
 };
 
-const JSON_MED_KEYS = [
-  'medicalHistory', 'currentMedications', 'allergies',
-  'chronicConditions', 'immunizations', 'familyHistory', 'lifestyleFactors',
-];
+const JSON_MED_KEYS = ['medicalHistory','currentMedications','allergies','chronicConditions','immunizations','familyHistory','lifestyleFactors'];
+const BLOOD_GROUPS  = ['A+','A-','B+','B-','AB+','AB-','O+','O-'];
+const GENDERS       = ['MALE','FEMALE','OTHER','PREFER_NOT_TO_SAY'];
+const MARITAL       = ['SINGLE','MARRIED','DIVORCED','WIDOWED'];
+const STATUSES      = ['ACTIVE','INACTIVE','DECEASED','TRANSFERRED'];
+const REG_TYPES     = ['OPD','IPD','Online','EMERGENCY','REFERRAL'];
 
-const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
-const GENDERS      = ['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY'];
-const MARITAL      = ['SINGLE', 'MARRIED', 'DIVORCED', 'WIDOWED'];
-const STATUSES     = ['ACTIVE', 'INACTIVE', 'DECEASED', 'TRANSFERRED'];
-const REG_TYPES    = ['OPD', 'IPD', 'Online', 'EMERGENCY', 'REFERRAL'];
+// ── Reusable searchable dropdown ───────────────────────────────────────────────
+function SearchableSelect({ label, placeholder, options, value, onSelect, loading }) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen]   = useState(false);
+  const wrapRef           = useRef(null);
 
-/** Backend returns BloodGroup enum as { dbValue: "O+" } or plain string */
-const resolveBloodGroup = (bg) => {
-  if (!bg) return '';
-  if (typeof bg === 'object' && bg.dbValue) return bg.dbValue;
-  return String(bg);
-};
+  useEffect(() => {
+    const h = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
 
-const parseJsonSafe = (str) => {
-  const raw = (str || '').trim();
-  if (!raw || raw === '{}') return null;
-  try { return JSON.parse(raw); } catch { return {}; }
-};
+  const filtered = options.filter(o =>
+    o.label.toLowerCase().includes(query.toLowerCase()) || String(o.id).includes(query)
+  );
 
+  return (
+    <div className="form-group" ref={wrapRef} style={{ position: 'relative' }}>
+      <label className="form-label">{label}</label>
+      <div className="form-control" onClick={() => setOpen(o => !o)}
+        style={{ display:'flex', alignItems:'center', cursor:'pointer', padding:'0 10px', gap:8, minHeight:40 }}>
+        {value
+          ? <span style={{ flex:1, fontSize:14, color:'#e0eaff' }}>{value.label}</span>
+          : <span style={{ flex:1, fontSize:13, color:'#666' }}>{placeholder}</span>
+        }
+        {value && (
+          <span onClick={e => { e.stopPropagation(); onSelect(null); setQuery(''); }}
+            style={{ cursor:'pointer', color:'#aaa', fontSize:16 }}>✕</span>
+        )}
+        <span style={{ color:'#aaa', fontSize:11 }}>{open ? '▲' : '▼'}</span>
+      </div>
+      {value && (
+        <div style={{ fontSize:11, color:'#8899b4', marginTop:3 }}>
+          ID: {value.id}{value.sub ? ' · ' + value.sub : ''}
+        </div>
+      )}
+      {open && (
+        <div style={{
+          position:'absolute', top:'100%', left:0, right:0, zIndex:1000,
+          background:'#1e2d3d', border:'1px solid #2d4a6b', borderRadius:8,
+          boxShadow:'0 8px 28px rgba(0,0,0,.55)', maxHeight:240,
+          display:'flex', flexDirection:'column',
+        }}>
+          <div style={{ padding:'8px 10px', borderBottom:'1px solid #2d4a6b' }}>
+            <input autoFocus className="form-control" style={{ margin:0, fontSize:13 }}
+              placeholder="Type to search…" value={query}
+              onChange={e => setQuery(e.target.value)} onClick={e => e.stopPropagation()} />
+          </div>
+          <div style={{ overflowY:'auto', flex:1 }}>
+            {loading && <div style={{ padding:'12px 14px', color:'#8899b4', fontSize:13 }}>Loading…</div>}
+            {!loading && filtered.length === 0 && (
+              <div style={{ padding:'12px 14px', color:'#8899b4', fontSize:13 }}>No results</div>
+            )}
+            {!loading && filtered.map(opt => (
+              <div key={opt.id}
+                onClick={() => { onSelect(opt); setQuery(''); setOpen(false); }}
+                style={{ padding:'10px 14px', cursor:'pointer', fontSize:13,
+                  background: value?.id === opt.id ? '#1a3a5c' : 'transparent',
+                  borderBottom:'1px solid #182533' }}
+                onMouseEnter={e => e.currentTarget.style.background = '#1a3a5c'}
+                onMouseLeave={e => e.currentTarget.style.background = value?.id === opt.id ? '#1a3a5c' : 'transparent'}
+              >
+                <div style={{ fontWeight:600, color:'#e0eaff' }}>{opt.label}</div>
+                {opt.sub && <div style={{ color:'#8899b4', fontSize:11, marginTop:2 }}>{opt.sub}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main Component ─────────────────────────────────────────────────────────────
 export default function PatientForm({ patient, onClose, onSaved }) {
   const [tab, setTab]       = useState(0);
   const [form, setForm]     = useState(EMPTY);
   const [saving, setSaving] = useState(false);
 
+  const [doctors, setDoctors]       = useState([]);
+  const [loadingDoc, setLoadingDoc] = useState(true);
+  const [selDoctor, setSelDoctor]   = useState(null);
+
+  // Load doctors for primary-doctor dropdown
+  useEffect(() => {
+    hospitalAPI.getDoctors()
+      .then(r => setDoctors(
+        (r.data || []).map(d => ({
+          id:    d.id,
+          label: d.name,
+          sub:   d.specialization || '',
+        }))
+      ))
+      .catch(() => toast.error('Could not load doctors list'))
+      .finally(() => setLoadingDoc(false));
+  }, []);
+
+  // Pre-fill when editing
   useEffect(() => {
     if (patient) {
       const init = { ...EMPTY, ...patient };
@@ -104,40 +143,49 @@ export default function PatientForm({ patient, onClose, onSaved }) {
         const v = patient[k];
         init[k] = v && typeof v === 'object' ? JSON.stringify(v, null, 2) : (v || '{}');
       });
-      const ins = patient.insuranceDetails;
-      init.insuranceDetails = ins && typeof ins === 'object' ? JSON.stringify(ins, null, 2) : (ins || '{}');
-      init.bloodGroup = resolveBloodGroup(patient.bloodGroup);
       setForm(init);
+      if (patient.primaryDoctorId) {
+        setSelDoctor({
+          id:    patient.primaryDoctorId,
+          label: patient.primaryDoctorName || `Doctor #${patient.primaryDoctorId}`,
+          sub:   '',
+        });
+      }
     }
   }, [patient]);
 
   const setField = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
+  const handleDoctorSelect = (opt) => {
+    setSelDoctor(opt);
+    if (opt) {
+      setForm(f => ({ ...f, primaryDoctorId: opt.id, primaryDoctorName: opt.label }));
+    } else {
+      setForm(f => ({ ...f, primaryDoctorId: null, primaryDoctorName: '' }));
+    }
+  };
+
   const buildPayload = () => {
     const payload = { ...form };
-    JSON_MED_KEYS.forEach(k => { payload[k] = parseJsonSafe(form[k]); });
-    payload.insuranceDetails = parseJsonSafe(form.insuranceDetails);
-    payload.primaryDoctorId  = form.primaryDoctorId ? Number(form.primaryDoctorId) : null;
-    if (!payload.registrationDate) payload.registrationDate = new Date().toISOString().split('T')[0];
-    if (!payload.insuranceValidFrom) payload.insuranceValidFrom = null;
-    if (!payload.insuranceValidTo)   payload.insuranceValidTo   = null;
-    if (!payload.dateOfBirth)        payload.dateOfBirth        = null;
+    JSON_MED_KEYS.forEach(k => {
+      const raw = (payload[k] || '').trim();
+      try   { payload[k] = JSON.parse(raw || '{}'); }
+      catch { payload[k] = {}; }
+    });
+    if (!payload.insuranceDetails) payload.insuranceDetails = { coverage: 'full' };
+    if (payload.primaryDoctorId) payload.primaryDoctorId = Number(payload.primaryDoctorId);
+    else delete payload.primaryDoctorId;
+    if (!payload.registrationDate)
+      payload.registrationDate = new Date().toISOString().split('T')[0];
     return payload;
   };
 
   const handleSubmit = async () => {
-    if (!form.firstName.trim() || !form.lastName.trim()) {
-      toast.error('First name and Last name are required'); return;
-    }
-    if (!form.mobile.trim()) {
-      toast.error('Mobile number is required'); return;
-    }
-    if (!form.dateOfBirth) {
-      toast.error('Date of birth is required'); return;
-    }
-    if (!form.gender) {
-      toast.error('Gender is required'); return;
-    }
+    if (!form.firstName.trim() || !form.lastName.trim()) { toast.error('First name and Last name are required'); return; }
+    if (!form.mobile.trim())   { toast.error('Mobile number is required'); return; }
+    if (!form.dateOfBirth)     { toast.error('Date of birth is required'); return; }
+    if (!form.gender)          { toast.error('Gender is required'); return; }
+
     setSaving(true);
     try {
       const payload = buildPayload();
@@ -152,7 +200,7 @@ export default function PatientForm({ patient, onClose, onSaved }) {
     } catch (error) {
       const msg = error.response?.data?.error
         || error.response?.data?.message
-        || 'Save failed. Please ensure the backend is running.';
+        || 'Save failed. Please ensure the backend is running and you are logged in.';
       toast.error(msg);
     } finally {
       setSaving(false);
@@ -180,12 +228,14 @@ export default function PatientForm({ patient, onClose, onSaved }) {
 
         <div className="modal-body">
 
+          {/* ── Tab 0: Personal ── */}
           {tab === 0 && (
             <div className="form-grid">
               <div className="form-group">
                 <label className="form-label">Patient ID</label>
                 <input className="form-control" value={form.patientId}
-                  onChange={e => setField('patientId', e.target.value)} placeholder="e.g. P1001 (auto if blank)" />
+                  onChange={e => setField('patientId', e.target.value)}
+                  placeholder="e.g. P1001 (auto-generated if blank)" />
               </div>
               <div className="form-group">
                 <label className="form-label">Patient Status</label>
@@ -265,24 +315,31 @@ export default function PatientForm({ patient, onClose, onSaved }) {
                 <input type="date" className="form-control" value={form.registrationDate}
                   onChange={e => setField('registrationDate', e.target.value)} />
               </div>
+
+              {/* FIXED: Primary Doctor is now a searchable dropdown */}
+              <SearchableSelect
+                label="Primary Doctor"
+                placeholder="Search doctor by name…"
+                options={doctors}
+                value={selDoctor}
+                onSelect={handleDoctorSelect}
+                loading={loadingDoc}
+              />
+
               <div className="form-group">
-                <label className="form-label">Primary Doctor ID</label>
-                <input type="number" className="form-control" value={form.primaryDoctorId}
-                  onChange={e => setField('primaryDoctorId', e.target.value)} placeholder="101" min="1" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Primary Doctor Name</label>
-                <input className="form-control" value={form.primaryDoctorName}
-                  onChange={e => setField('primaryDoctorName', e.target.value)} placeholder="Dr. Sharma" />
+                <label className="form-label">Profile Photo URL</label>
+                <input className="form-control" value={form.profilePhotoUrl}
+                  onChange={e => setField('profilePhotoUrl', e.target.value)} placeholder="https://…/photo.jpg" />
               </div>
               <div className="form-group full">
                 <label className="form-label">Notes</label>
                 <textarea className="form-control" rows={2} value={form.notes}
-                  onChange={e => setField('notes', e.target.value)} placeholder="First visit…" />
+                  onChange={e => setField('notes', e.target.value)} placeholder="First visit, referred by Dr. Joshi…" />
               </div>
             </div>
           )}
 
+          {/* ── Tab 1: Contact & Address ── */}
           {tab === 1 && (
             <div className="form-grid">
               <div className="form-group">
@@ -338,16 +395,17 @@ export default function PatientForm({ patient, onClose, onSaved }) {
             </div>
           )}
 
+          {/* ── Tab 2: Medical (JSON) ── */}
           {tab === 2 && (
             <div className="form-grid">
               {[
-                ['medicalHistory',     'Medical History',     '{"past_illness":"none","surgeries":"none"}'],
+                ['medicalHistory',     'Medical History',     '{"past_illness":"Appendectomy 2010","surgeries":"none"}'],
                 ['currentMedications', 'Current Medications', '{"medications":"paracetamol 500mg twice daily"}'],
-                ['allergies',          'Allergies',           '{"allergy":"dust"}'],
-                ['chronicConditions',  'Chronic Conditions',  '{"condition":"none"}'],
-                ['immunizations',      'Immunizations',       '{"covid_vaccine":"2 doses","flu":"annual"}'],
+                ['allergies',          'Allergies',           '{"allergy":"dust, pollen"}'],
+                ['chronicConditions',  'Chronic Conditions',  '{"condition":"Hypertension"}'],
+                ['immunizations',      'Immunizations',       '{"covid_vaccine":"2 doses + booster","flu":"annual"}'],
                 ['familyHistory',      'Family History',      '{"father":"diabetes","mother":"hypertension"}'],
-                ['lifestyleFactors',   'Lifestyle Factors',   '{"smoking":false,"alcohol":"occasionally"}'],
+                ['lifestyleFactors',   'Lifestyle Factors',   '{"smoking":false,"alcohol":"occasionally","exercise":"regular"}'],
               ].map(([key, label, placeholder]) => (
                 <div key={key} className="form-group full">
                   <label className="form-label">
@@ -360,6 +418,7 @@ export default function PatientForm({ patient, onClose, onSaved }) {
             </div>
           )}
 
+          {/* ── Tab 3: Emergency Contact ── */}
           {tab === 3 && (
             <div className="form-grid">
               <div className="form-group">
@@ -377,9 +436,15 @@ export default function PatientForm({ patient, onClose, onSaved }) {
                 <input className="form-control" value={form.emergencyContactPhone}
                   onChange={e => setField('emergencyContactPhone', e.target.value)} placeholder="9876500000" />
               </div>
+              <div className="form-group">
+                <label className="form-label">Alternate Phone</label>
+                <input className="form-control" value={form.emergencyContactAlternate}
+                  onChange={e => setField('emergencyContactAlternate', e.target.value)} placeholder="9876500001" />
+              </div>
             </div>
           )}
 
+          {/* ── Tab 4: Insurance ── */}
           {tab === 4 && (
             <div className="form-grid">
               <div className="form-group">
@@ -412,8 +477,10 @@ export default function PatientForm({ patient, onClose, onSaved }) {
                   Insurance Details <span className="badge badge-info" style={{ fontSize: 9 }}>JSON</span>
                 </label>
                 <textarea className="form-control" rows={2}
-                  placeholder='{"coverage":"full","copay":"500"}'
-                  value={form.insuranceDetails}
+                  placeholder='{"coverage":"full","copay":"500","deductible":"2000"}'
+                  value={typeof form.insuranceDetails === 'object'
+                    ? JSON.stringify(form.insuranceDetails, null, 2)
+                    : (form.insuranceDetails || '')}
                   onChange={e => setField('insuranceDetails', e.target.value)} />
               </div>
             </div>
@@ -422,11 +489,9 @@ export default function PatientForm({ patient, onClose, onSaved }) {
 
         <div className="modal-footer">
           <div className="tab-nav">
-            <button className="btn btn-secondary btn-sm" disabled={tab === 0}
-              onClick={() => setTab(t => t - 1)}>← Prev</button>
+            <button className="btn btn-secondary btn-sm" disabled={tab === 0} onClick={() => setTab(t => t - 1)}>← Prev</button>
             <span className="tab-progress">{tab + 1}/{TABS.length}</span>
-            <button className="btn btn-secondary btn-sm" disabled={tab === TABS.length - 1}
-              onClick={() => setTab(t => t + 1)}>Next →</button>
+            <button className="btn btn-secondary btn-sm" disabled={tab === TABS.length - 1} onClick={() => setTab(t => t + 1)}>Next →</button>
           </div>
           <div>
             <button className="btn btn-secondary" onClick={onClose}>Cancel</button>

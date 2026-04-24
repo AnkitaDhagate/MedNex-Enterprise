@@ -3,17 +3,27 @@ package com.mednex.backend.service;
 import com.mednex.backend.model.AuditLog;
 import com.mednex.backend.repository.AuditLogRepository;
 import com.mednex.backend.tenant.TenantContext;
+import com.mednex.backend.tenant.TenantIdentifierResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * FIX: Audit logging is @Async and runs in its own thread.
+ * That thread has NO TenantContext set, so Hibernate uses the default datasource.
+ * We set it explicitly, then clear it in finally so we don't leak state.
+ *
+ * CRITICAL: Audit failures must NEVER propagate back and rollback patient/appointment saves.
+ * All exceptions are swallowed here.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -21,36 +31,21 @@ public class AuditService {
 
     private final AuditLogRepository auditLogRepository;
 
-    /**
-     * FIX — Root cause of "Could not open JPA EntityManager for transaction" at registration:
-     *
-     * @Async runs on a Spring thread-pool thread. TenantContext uses a ThreadLocal,
-     * so it is ALWAYS null on the async thread — the original request's ThreadLocal
-     * value never transfers. When auditLogRepository.save() fires, Hibernate calls
-     * resolveCurrentTenantIdentifier(), gets null, and throws the EntityManager error.
-     *
-     * Solution: accept tenantId as an explicit parameter and set it on the async
-     * thread's own ThreadLocal BEFORE touching the repository, then clear it after.
-     */
+    /** Convenience overload (no tenantId) */
     @Async
-    @Transactional
     public void log(String username, String action, String resourceType,
                     String resourceId, String description) {
-        // tenantId resolved by caller's thread; default to "system" if missing
-        log("system", username, action, resourceType, resourceId, description);
+        log("HOSP_A", username, action, resourceType, resourceId, description);
     }
 
     @Async
-    @Transactional
-    public void log(String tenantId, String username, String action, String resourceType,
-                    String resourceId, String description) {
-        String resolvedTenant = (tenantId != null && !tenantId.isBlank()) ? tenantId : "tenant_a";
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void log(String tenantId, String username, String action,
+                    String resourceType, String resourceId, String description) {
+        String resolvedTenant = (tenantId != null && !tenantId.isBlank()) ? tenantId : "HOSP_A";
+        String datasourceKey  = TenantIdentifierResolver.toDataSourceKey(resolvedTenant);
         try {
-            // FIX: Explicitly set tenant on THIS async thread's ThreadLocal.
-            // Without this, TenantContext.getCurrentTenant() returns null on the
-            // async thread, Hibernate cannot resolve the datasource, and throws
-            // "Could not open JPA EntityManager for transaction".
-            TenantContext.setCurrentTenant(resolvedTenant);
+            TenantContext.setCurrentTenant(datasourceKey);
 
             AuditLog entry = new AuditLog();
             entry.setTenantId(resolvedTenant);
@@ -61,11 +56,10 @@ public class AuditService {
             entry.setDescription(description);
             entry.setSuccess(true);
             auditLogRepository.save(entry);
-
         } catch (Exception e) {
-            log.error("Failed to write audit log (tenant={}): {}", resolvedTenant, e.getMessage());
+            // Swallow — never let audit failure affect patient/appointment saves
+            log.warn("Audit log write failed (data was saved): {}", e.getMessage());
         } finally {
-            // Always clear the async thread's ThreadLocal after use
             TenantContext.clear();
         }
     }
@@ -75,9 +69,7 @@ public class AuditService {
                 tenantId, PageRequest.of(page, size));
     }
 
-    public List<AuditLog> getAccessLogsForRecord(String tenantId,
-                                                  String resourceType,
-                                                  String resourceId) {
+    public List<AuditLog> getAccessLogsForRecord(String tenantId, String resourceType, String resourceId) {
         return auditLogRepository.findByTenantIdAndResourceTypeAndResourceId(
                 tenantId, resourceType, resourceId);
     }
@@ -86,10 +78,7 @@ public class AuditService {
         return auditLogRepository.findByTenantIdAndUsernameOrderByTimestampDesc(tenantId, username);
     }
 
-    public List<AuditLog> getLogsByDateRange(String tenantId,
-                                              LocalDateTime from,
-                                              LocalDateTime to) {
-        return auditLogRepository.findByTenantIdAndTimestampBetweenOrderByTimestampDesc(
-                tenantId, from, to);
+    public List<AuditLog> getLogsByDateRange(String tenantId, LocalDateTime from, LocalDateTime to) {
+        return auditLogRepository.findByTenantIdAndTimestampBetweenOrderByTimestampDesc(tenantId, from, to);
     }
 }

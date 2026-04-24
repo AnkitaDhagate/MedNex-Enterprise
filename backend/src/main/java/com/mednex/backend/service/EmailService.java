@@ -1,8 +1,8 @@
 package com.mednex.backend.service;
 
 import com.mednex.backend.model.Appointment;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
@@ -11,17 +11,27 @@ import org.springframework.stereotype.Service;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 
+/**
+ * FIX: Email failures must NOT crash the appointment save.
+ * - @Async ensures email runs on a separate thread after DB commit.
+ * - All exceptions are caught silently — a missing SMTP config should
+ *   never prevent patient/appointment data from being saved.
+ */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class EmailService {
 
-    private final JavaMailSender mailSender;
+    @Autowired(required = false)
+    private JavaMailSender mailSender;
 
     @Async
     public void sendAppointmentConfirmation(Appointment appointment) {
+        if (mailSender == null) {
+            log.info("Mail sender not configured — skipping confirmation email.");
+            return;
+        }
         if (appointment.getPatientEmail() == null || appointment.getPatientEmail().isBlank()) {
-            log.warn("No email for appointment {}, skipping confirmation.", appointment.getAppointmentId());
+            log.debug("No patient email for appointment {}, skipping confirmation.", appointment.getAppointmentId());
             return;
         }
         try {
@@ -32,13 +42,15 @@ public class EmailService {
             helper.setText(buildConfirmationHtml(appointment), true);
             mailSender.send(message);
             log.info("Confirmation sent to {}", appointment.getPatientEmail());
-        } catch (MessagingException e) {
-            log.error("Failed to send confirmation: {}", e.getMessage());
+        } catch (Exception e) {
+            // Never let email failure crash the main flow
+            log.warn("Failed to send confirmation email (appointment saved successfully): {}", e.getMessage());
         }
     }
 
     @Async
     public void sendAppointmentReminder(Appointment appointment) {
+        if (mailSender == null) return;
         if (appointment.getPatientEmail() == null || appointment.getPatientEmail().isBlank()) return;
         try {
             MimeMessage message = mailSender.createMimeMessage();
@@ -48,8 +60,8 @@ public class EmailService {
             helper.setText(buildReminderHtml(appointment), true);
             mailSender.send(message);
             log.info("Reminder sent to {}", appointment.getPatientEmail());
-        } catch (MessagingException e) {
-            log.error("Failed to send reminder: {}", e.getMessage());
+        } catch (Exception e) {
+            log.warn("Failed to send reminder email: {}", e.getMessage());
         }
     }
 
@@ -67,9 +79,9 @@ public class EmailService {
                 + row("Date",           safe(a.getAppointmentDate()), false)
                 + row("Time",           safe(a.getAppointmentTime()), true)
                 + "</table>"
-                + "<p>Please arrive 10 minutes early with valid ID and insurance card.</p>"
+                + "<p>Please arrive 10 minutes early with valid ID.</p>"
                 + "<hr style='border:none;border-top:1px solid #eee;margin:20px 0'>"
-                + "<p style='font-size:12px;color:#999'>MedNex Enterprise Hospital Management System</p>"
+                + "<p style='font-size:12px;color:#999'>MedNex Hospital Management System</p>"
                 + "</div></body></html>";
     }
 
@@ -85,9 +97,8 @@ public class EmailService {
                 + row("Date",   safe(a.getAppointmentDate()), false)
                 + row("Time",   safe(a.getAppointmentTime()), true)
                 + "</table>"
-                + "<p>Bring all relevant medical reports and insurance documents.</p>"
                 + "<hr style='border:none;border-top:1px solid #eee;margin:20px 0'>"
-                + "<p style='font-size:12px;color:#999'>MedNex Enterprise Hospital Management System</p>"
+                + "<p style='font-size:12px;color:#999'>MedNex Hospital Management System</p>"
                 + "</div></body></html>";
     }
 

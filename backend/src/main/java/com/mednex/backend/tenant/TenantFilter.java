@@ -7,31 +7,27 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.util.Map;
+import java.util.Set;
 
 /**
- * FIX 1 (CRITICAL): Original code only accepted "tenant_a" and "tenant_b",
- * but the schema uses "HOSP_A", "HOSP_B", "HOSP_C" as tenant IDs.
- * The frontend sends X-Tenant-ID = "HOSP_A" / "HOSP_B" / "HOSP_C".
+ * FIX: Two critical fixes here:
  *
- * This filter now:
- *  - Accepts HOSP_A → maps to "tenant_a" (mednex_tenant_a DB)
- *  - Accepts HOSP_B → maps to "tenant_b" (mednex_tenant_b DB)
- *  - Accepts HOSP_C → maps to "tenant_a" (basic plan shares mednex_db)
- *  - Rejects any other value with 403
+ * 1. Store the ORIGINAL tenant ID (HOSP_A / HOSP_B / HOSP_C) in TenantContext.
+ *    This is what gets written to patients.tenant_id / appointments.tenant_id.
+ *    The DB tenants table has: HOSP_A, HOSP_B, HOSP_C — these must match exactly.
+ *    The old code mapped "HOSP_A" → "tenant_a" which caused FK violations on every insert.
+ *
+ * 2. TenantIdentifierResolver uses a SEPARATE mapping to pick the datasource (tenant_a / tenant_b).
+ *    So TenantContext = "HOSP_A" (for DB column) but Hibernate routes to datasource "tenant_a".
+ *
+ * 3. Default to HOSP_A when no header is sent (allows testing without headers).
  */
 @Component
 @Order(1)
 public class TenantFilter implements Filter {
 
-    // Map frontend tenant IDs (from schema) → backend datasource keys
-    private static final Map<String, String> TENANT_MAP = Map.of(
-            "hosp_a",   "tenant_a",
-            "hosp_b",   "tenant_b",
-            "hosp_c",   "tenant_a",   // HOSP_C shares mednex_db (Basic plan)
-            "tenant_a", "tenant_a",   // also accept direct datasource keys
-            "tenant_b", "tenant_b"
-    );
+    private static final Set<String> VALID_TENANTS = Set.of("HOSP_A", "HOSP_B", "HOSP_C");
+    private static final String DEFAULT_TENANT = "HOSP_A";
 
     @Override
     public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
@@ -42,23 +38,24 @@ public class TenantFilter implements Filter {
 
         String tenantHeader = httpReq.getHeader("X-Tenant-ID");
 
+        String tenant;
         if (tenantHeader != null && !tenantHeader.isBlank()) {
-            String normalized = tenantHeader.toLowerCase().trim();
-            String resolved   = TENANT_MAP.get(normalized);
-
-            if (resolved == null) {
-                // Unknown tenant → reject
+            tenant = tenantHeader.trim().toUpperCase();
+            if (!VALID_TENANTS.contains(tenant)) {
+                // Return 403 with details
                 httpRes.setStatus(HttpServletResponse.SC_FORBIDDEN);
                 httpRes.setContentType("application/json");
                 httpRes.getWriter().write(
-                        "{\"error\":\"Invalid tenant ID '" + tenantHeader + "'. Cross-tenant access denied.\"}");
+                    "{\"error\":\"Invalid tenant: '" + tenantHeader + "'. Valid: HOSP_A, HOSP_B, HOSP_C\"}");
                 return;
             }
-            TenantContext.setCurrentTenant(resolved);
         } else {
-            // No header → default to tenant_a so Hibernate can open EntityManager
-            TenantContext.setCurrentTenant("tenant_a");
+            // No header → default. This allows curl testing without headers.
+            tenant = DEFAULT_TENANT;
         }
+
+        // Store the actual tenant ID (HOSP_A), NOT the datasource key (tenant_a)
+        TenantContext.setCurrentTenant(tenant);
 
         try {
             chain.doFilter(req, res);
